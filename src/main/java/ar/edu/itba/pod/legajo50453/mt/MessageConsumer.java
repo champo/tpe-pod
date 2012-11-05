@@ -11,6 +11,7 @@ import ar.edu.itba.pod.legajo50453.message.AnswerableMessage;
 import ar.edu.itba.pod.legajo50453.message.BackupSignal;
 import ar.edu.itba.pod.legajo50453.message.MessageDispatcher;
 import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
+import ar.edu.itba.pod.legajo50453.mt.Processor.WorkReady;
 
 public class MessageConsumer implements Runnable {
 	
@@ -55,7 +56,7 @@ public class MessageConsumer implements Runnable {
 		
 	}
 
-	private void handleMessage(Message msg) {
+	private void handleMessage(final Message msg) {
 		
 		final AnswerableMessage answerable = (AnswerableMessage) msg.getObject();
 		final Object object = answerable.getPayload();
@@ -70,13 +71,20 @@ public class MessageConsumer implements Runnable {
 			}
 		} else if (object instanceof SimilarRequest) {
 			final SimilarRequest request = (SimilarRequest) object;
-			try {
-				final Result result = processor.process(request.getSignal());
-				dispatcher.respondTo(msg.getSrc(), answerable.getId(), result);
-			} catch (final Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			processor.request(request.getSignal(), new WorkReady() {
+				
+				@Override
+				public void result(Result result) {
+				
+					try {
+						dispatcher.respondTo(msg.getSrc(), answerable.getId(), result);
+					} catch (final Exception e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					
+				}
+			});
 		}
 		
 	}
