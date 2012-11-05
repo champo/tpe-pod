@@ -36,9 +36,10 @@ public class MessageDispatcher {
 	}
 	
 	public void nodeDisconnected(Address address) {
-		final Collection<ResponseFuture<?>> futures = addressToFuture.removeAll(address);
-		if (futures != null) {
-			for (final ResponseFuture<?> future : futures) {
+		final Collection<ResponseFuture<?>> brokenFutures = addressToFuture.removeAll(address);
+		if (brokenFutures != null) {
+			for (final ResponseFuture<?> future : brokenFutures) {
+				futures.remove(future.getId());
 				future.nodeDisconnected();
 			}
 		}
@@ -47,7 +48,7 @@ public class MessageDispatcher {
 	public <T> Future<T> sendMessage(Address address, Serializable obj) {
 		
 		final long id = idGenerator.getAndIncrement();
-		final ResponseFuture<T> future = new ResponseFuture<T>();
+		final ResponseFuture<T> future = new ResponseFuture<T>(id);
 		
 		addressToFuture.put(address, future);
 		futures.put(id, future);
@@ -64,10 +65,11 @@ public class MessageDispatcher {
 		return future;
 	}
 	
-	public void processResponse(AnswerMessage response) {
+	public void processResponse(Address origin, AnswerMessage response) {
 		
 		final ResponseFuture<?> future = futures.remove(response.getId());
 		if (future != null) {
+			addressToFuture.remove(origin, future);
 			future.setResponse(response.getPayload());
 		}
 	}
@@ -76,9 +78,6 @@ public class MessageDispatcher {
 		channel.send(address, new AnswerMessage(id, payload));
 	}
 
-
-	
-	
 	public class ResponseFuture<T> implements Future<T> {
 		
 		private T response;
@@ -89,6 +88,16 @@ public class MessageDispatcher {
 		
 		private Exception cause;
 		
+		private final long id;
+		
+		public ResponseFuture(long id) {
+			super();
+			this.id = id;
+		}
+
+		public long getId() {
+			return id;
+		}
 		
 		void setResponse(Serializable response) {
 			

@@ -39,7 +39,7 @@ public class MessageConsumer implements Runnable {
 					if (object instanceof AnswerableMessage) {
 						handleMessage(msg);
 					} else if (object instanceof AnswerMessage) {
-						dispatcher.processResponse((AnswerMessage) object);
+						dispatcher.processResponse(msg.getSrc(), (AnswerMessage) object);
 					}
 				}
 			}
