@@ -119,7 +119,7 @@ public class Node implements SignalProcessor, SPNode {
 	@Override
 	public void add(Signal signal) throws RemoteException {
 		
-		if (store.add(signal)) {
+		if (store.add(signal) && currentView.size() > 1) {
 			// The signal is new enough, let's back it up
 			sendBackup(signal);
 		}
