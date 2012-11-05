@@ -66,6 +66,11 @@ public class SignalStore {
 		return primaries;
 	}
 	
+	public long getBackupCount() {
+		
+		synchronized (backups) {
+			return backups.size();
+		}
+	}
 	
-
 }

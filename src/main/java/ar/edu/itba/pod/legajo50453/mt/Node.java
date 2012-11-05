@@ -113,7 +113,7 @@ public class Node implements SignalProcessor, SPNode {
 			}
 		}
 		
-		return new NodeStats(channel.getName(), recieved.get(), store.getPrimaryCount(), 0, degraded);
+		return new NodeStats(channel.getName(), recieved.get(), store.getPrimaryCount(), store.getBackupCount(), degraded);
 	}
 
 	@Override
