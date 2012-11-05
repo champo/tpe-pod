@@ -21,7 +21,7 @@ import org.junit.Test;
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
 import ar.edu.itba.pod.impl.StandaloneSignalProcessor;
-import ar.edu.itba.pod.legajo50453.mt.MultiThreadSignalProcessor;
+import ar.edu.itba.pod.legajo50453.mt.Node;
 import ar.edu.itba.pod.signal.source.RandomSource;
 import ar.edu.itba.pod.signal.source.Source;
 
@@ -47,7 +47,7 @@ public class MultiThreadTest {
 	 * Initialize or get a reference to the signal processor to be tested.
 	 */
 	protected SignalProcessor init() throws Exception {
-		return new MultiThreadSignalProcessor(4);
+		return new Node(4);
 	}
 	
 	@Test

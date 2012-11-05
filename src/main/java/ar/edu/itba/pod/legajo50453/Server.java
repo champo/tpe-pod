@@ -9,7 +9,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 
-import ar.edu.itba.pod.legajo50453.mt.MultiThreadSignalProcessor;
+import ar.edu.itba.pod.legajo50453.mt.Node;
 
 /**
  * @author champo
@@ -38,7 +38,7 @@ public class Server {
 		try {
 			Registry registry = LocateRegistry.createRegistry(port);
 
-			MultiThreadSignalProcessor processor = new MultiThreadSignalProcessor(threads);
+			Node processor = new Node(threads);
 			UnicastRemoteObject.exportObject(processor, port);
 			
 			registry.bind("SPNode", processor);
@@ -47,6 +47,8 @@ public class Server {
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		} catch (AlreadyBoundException e) {
+			e.printStackTrace();
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		
