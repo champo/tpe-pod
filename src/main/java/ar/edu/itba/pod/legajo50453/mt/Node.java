@@ -229,6 +229,7 @@ public class Node implements SignalProcessor, SPNode {
 				stableNodes = 0;
 			} else {
 				dispatcher.nodeDisconnected(change);
+				//TODO: Handle rebalacing
 			}
 		}
 	}
