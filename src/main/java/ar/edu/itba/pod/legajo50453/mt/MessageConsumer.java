@@ -39,13 +39,16 @@ public class MessageConsumer implements Runnable {
 			while (true) {
 				final Message msg = queue.poll(1, TimeUnit.SECONDS);
 				if (msg != null) {
-					
-					
-					final Object object = msg.getObject();
-					if (object instanceof AnswerableMessage) {
-						handleMessage(msg);
-					} else if (object instanceof AnswerMessage) {
-						dispatcher.processResponse(msg.getSrc(), (AnswerMessage) object);
+
+					try {
+						final Object object = msg.getObject();
+						if (object instanceof AnswerableMessage) {
+							handleMessage(msg);
+						} else if (object instanceof AnswerMessage) {
+							dispatcher.processResponse(msg.getSrc(), (AnswerMessage) object);
+						}
+					} catch (final RuntimeException e) {
+						System.out.println("Caught exception while handling message:\n" + e);
 					}
 				}
 			}
