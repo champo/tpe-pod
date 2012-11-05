@@ -26,12 +26,12 @@ public class Processor {
 	 * @author champo
 	 *
 	 */
-	public interface WorkReady {
+	public static interface WorkReady {
 
 		public void result(Result result);
 	}
 
-	private final class WorkItem {
+	private static final class WorkItem {
 
 		public WorkItem(Signal signal, WorkReady ready) {
 			this.signal = signal;

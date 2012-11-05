@@ -78,7 +78,7 @@ public class MessageDispatcher {
 		channel.send(address, new AnswerMessage(id, payload));
 	}
 
-	public class ResponseFuture<T> implements Future<T> {
+	private static class ResponseFuture<T> implements Future<T> {
 		
 		private T response;
 		
