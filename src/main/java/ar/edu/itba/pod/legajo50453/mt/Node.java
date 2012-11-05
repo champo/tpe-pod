@@ -134,6 +134,11 @@ public class Node implements SignalProcessor, SPNode {
 			
 			final View view = channel.getView();
 			final Address address = view.getMembers().get(rnd.nextInt(view.size()));
+			
+			if (address.equals(channel.getAddress())) {
+				continue;
+			}
+			
 			final Future<Void> response = dispatcher.sendMessage(address, new BackupSignal(signal, channel.getAddress()));
 			
 			try {
