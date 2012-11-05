@@ -15,6 +15,7 @@ import static org.junit.Assert.assertEquals;
 import java.rmi.RemoteException;
 import java.util.Arrays;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -32,7 +33,7 @@ import ar.edu.itba.pod.signal.source.Source;
 public class MultiThreadTest {
 
 	private SignalProcessor reference;
-	private SignalProcessor toTest;
+	private Node toTest;
 	private Source src;
 	
 	@Before
@@ -41,13 +42,22 @@ public class MultiThreadTest {
 		toTest = init();
 		src = new RandomSource(12345);
 	}
+	
+	@After
+	public void tearDown() throws Exception {
+		toTest.exit();
+		toTest = null;
+	}
 
 
 	/**
 	 * Initialize or get a reference to the signal processor to be tested.
 	 */
-	protected SignalProcessor init() throws Exception {
-		return new Node(4);
+	protected Node init() throws Exception {
+		final Node node = new Node(4);
+		node.join("test-cluster");
+		
+		return node;
 	}
 	
 	@Test
@@ -67,7 +77,7 @@ public class MultiThreadTest {
 	@Test
 	public void test03() throws RemoteException {
 		addNoise(1000);
-		Signal r = src.next();
+		final Signal r = src.next();
 		add(rotate(r, 5));
 		add(rotate(r, 10));
 		add(rotate(r, 50));
@@ -87,7 +97,7 @@ public class MultiThreadTest {
 	@Test
 	public void test05() throws RemoteException {
 		addNoise(10);
-		Signal r = src.next();
+		final Signal r = src.next();
 		add(rotate(r, 5));
 		add(rotate(r, 10));
 		add(constant((byte)10));
@@ -97,7 +107,7 @@ public class MultiThreadTest {
 	@Test
 	public void test06() throws RemoteException {
 		addNoise(1000);
-		Signal r = triangle();
+		final Signal r = triangle();
 		add(r);
 		assertFind(r);
 	}
@@ -105,7 +115,7 @@ public class MultiThreadTest {
 	@Test
 	public void test07() throws RemoteException {
 		addNoise(10);
-		Signal r = src.next();
+		final Signal r = src.next();
 		add(rotate(r, 5));
 		add(rotate(r, 10));
 		add(constant((byte)10));
@@ -126,8 +136,8 @@ public class MultiThreadTest {
 	@Test
 	public void test09() throws RemoteException {
 		addNoise(150);
-		byte[] flux = Arrays.copyOfRange(triangle().content(), 3, 50);
-		Signal r = flux((byte)10, 50,flux );
+		final byte[] flux = Arrays.copyOfRange(triangle().content(), 3, 50);
+		final Signal r = flux((byte)10, 50,flux );
 		add(r);
 		assertFind(r);
 		
@@ -145,7 +155,7 @@ public class MultiThreadTest {
 	
 	private void addNoise(int amount) throws RemoteException {
 		for (int i = 0; i < amount; i++) {
-			Signal s = src.next();
+			final Signal s = src.next();
 			reference.add(s);
 			toTest.add(s);
 		}

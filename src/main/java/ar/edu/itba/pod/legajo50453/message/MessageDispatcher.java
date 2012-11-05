@@ -73,7 +73,7 @@ public class MessageDispatcher {
 	}
 	
 	public void respondTo(Address address, long id, Serializable payload) throws Exception {
-		channel.send(address, new AnswerableMessage(id, payload));
+		channel.send(address, new AnswerMessage(id, payload));
 	}
 
 

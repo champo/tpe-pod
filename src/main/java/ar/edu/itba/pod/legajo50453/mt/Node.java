@@ -77,6 +77,7 @@ public class Node implements SignalProcessor, SPNode {
 		
 		consumer = new MessageConsumer(inboundMessages, store, dispatcher);
 		consumerThread = new Thread(consumer);
+		consumerThread.start();
 	}
 
 	@Override
@@ -188,8 +189,13 @@ public class Node implements SignalProcessor, SPNode {
 		@Override
 		public void viewAccepted(View view) {
 			
-			final SetView<Address> difference = Sets.symmetricDifference(new HashSet<>(currentView.getMembers()), new HashSet<>(view.getMembers()));
+			if (currentView == null) {
+				currentView = view;
+				return;
+			}
 			
+			final SetView<Address> difference = Sets.symmetricDifference(new HashSet<>(currentView.getMembers()), new HashSet<>(view.getMembers()));
+			currentView = view;
 			if (difference.size() > 1) {
 				// WERE ALL DOOMED
 				throw new RuntimeException();

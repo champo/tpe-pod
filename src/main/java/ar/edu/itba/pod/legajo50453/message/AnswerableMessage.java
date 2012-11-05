@@ -2,7 +2,9 @@ package ar.edu.itba.pod.legajo50453.message;
 
 import java.io.Serializable;
 
-public class AnswerableMessage {
+public class AnswerableMessage implements Serializable {
+
+	private static final long serialVersionUID = 5067895203221119657L;
 
 	private final Serializable payload;
 	
