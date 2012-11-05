@@ -10,8 +10,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,6 +29,7 @@ import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
 import ar.edu.itba.pod.legajo50453.message.BackupSignal;
 import ar.edu.itba.pod.legajo50453.message.MessageDispatcher;
+import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
 
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
@@ -41,8 +40,6 @@ import com.google.common.collect.Sets.SetView;
  */
 public class Node implements SignalProcessor, SPNode {
 
-	private final ExecutorService pool;
-	
 	private final MessageConsumer consumer;
 	
 	private final AtomicInteger recieved = new AtomicInteger();
@@ -64,20 +61,24 @@ public class Node implements SignalProcessor, SPNode {
 	private final MessageDispatcher dispatcher;
 	
 	private View currentView;
+
+	private final Processor processor;
 	
 	public Node(int threads) throws Exception {
-		pool = Executors.newFixedThreadPool(threads);
-		
+
 		channel = new JChannel("jgroups.xml");
 		channel.setReceiver(new MessageReciever());
 		
 		inboundMessages = new LinkedBlockingDeque<>();
-		store = new SignalStore();
 		dispatcher = new MessageDispatcher(channel);
 		
-		consumer = new MessageConsumer(inboundMessages, store, dispatcher);
+		store = new SignalStore();
+		processor = new Processor(threads, store);
+		
+		consumer = new MessageConsumer(inboundMessages, store, dispatcher, processor);
 		consumerThread = new Thread(consumer);
 		consumerThread.start();
+		
 	}
 
 	@Override
@@ -95,6 +96,7 @@ public class Node implements SignalProcessor, SPNode {
 	public void exit() throws RemoteException {
 		suicide = true;
 		
+		processor.stop();
 		store.empty();
 		recieved.set(0);
 		channel.disconnect();
@@ -164,26 +166,37 @@ public class Node implements SignalProcessor, SPNode {
 		
 		recieved.incrementAndGet();
 		
-		final List<Future<Item>> futures = new ArrayList<Future<Item>>();
-		for (final Signal reference : store.getPrimaries()) {
-			final Future<Item> future = pool.submit(new WorkRequest(reference, signal));
-			futures.add(future);
+		final List<Future<Result>> remoteResults = new ArrayList<>();
+		for (final Address address : currentView.getMembers()) {
+			
+			if (address != channel.getAddress()) {
+				remoteResults.add(dispatcher.<Result>sendMessage(address, new SimilarRequest(signal)));
+			}
 		}
 		
-		Result result = new Result(signal);
-		for (final Future<Item> future : futures) {
+		Result result = processor.process(signal);
+		
+		for (final Future<Result> future : remoteResults) {
 			try {
-				result = result.include(future.get());
-			} catch (final InterruptedException e) {
-				e.printStackTrace();
-			} catch (final ExecutionException e) {
+				final Result remoteResult = future.get();
+				if (remoteResult != null) {
+					
+					for (final Item item : remoteResult.items()) {
+						result = result.include(item);
+					}
+				}
+				
+			} catch (InterruptedException | ExecutionException e) {
+				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
 		
 		return result;
 	}
-
+	
+	
+	
 	private final class MessageReciever extends ReceiverAdapter {
 		
 		@Override

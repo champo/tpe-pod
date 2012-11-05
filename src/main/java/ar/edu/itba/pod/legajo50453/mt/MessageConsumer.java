@@ -5,10 +5,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.jgroups.Message;
 
+import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.legajo50453.message.AnswerMessage;
 import ar.edu.itba.pod.legajo50453.message.AnswerableMessage;
 import ar.edu.itba.pod.legajo50453.message.BackupSignal;
 import ar.edu.itba.pod.legajo50453.message.MessageDispatcher;
+import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
 
 public class MessageConsumer implements Runnable {
 	
@@ -18,11 +20,14 @@ public class MessageConsumer implements Runnable {
 	
 	private final MessageDispatcher dispatcher;
 	
-	public MessageConsumer(BlockingQueue<Message> queue, SignalStore store, MessageDispatcher dispatcher) {
+	private final Processor processor;
+	
+	public MessageConsumer(BlockingQueue<Message> queue, SignalStore store, MessageDispatcher dispatcher, Processor processor) {
 		super();
 		this.queue = queue;
 		this.store = store;
 		this.dispatcher = dispatcher;
+		this.processor = processor;
 	}
 
 	@Override
@@ -59,6 +64,15 @@ public class MessageConsumer implements Runnable {
 			
 			try {
 				dispatcher.respondTo(msg.getSrc(), answerable.getId(), null);
+			} catch (final Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		} else if (object instanceof SimilarRequest) {
+			final SimilarRequest request = (SimilarRequest) object;
+			try {
+				final Result result = processor.process(request.getSignal());
+				dispatcher.respondTo(msg.getSrc(), answerable.getId(), result);
 			} catch (final Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
