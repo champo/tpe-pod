@@ -58,7 +58,12 @@ public class Processor {
 				WorkRequest item;
 				while ((item = queue.take()) != null) {
 					final Result result = process(item.signal);
-					item.callback.result(result);
+					
+					try { 
+						item.callback.result(result);
+					} catch (final RuntimeException e) {
+						System.out.println("Got exception on callback:\n" + e);
+					}
 				}
 			} catch (final InterruptedException e) {
 				// TODO Auto-generated catch block
