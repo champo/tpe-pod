@@ -1,7 +1,7 @@
 /**
  * 
  */
-package ar.edu.itba.pod.legajo50453.mt;
+package ar.edu.itba.pod.legajo50453.worker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +15,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.Result.Item;
 import ar.edu.itba.pod.api.Signal;
+import ar.edu.itba.pod.legajo50453.mt.SignalStore;
 
 /**
  * @author champo
@@ -26,21 +27,21 @@ public class Processor {
 	 * @author champo
 	 *
 	 */
-	public static interface WorkReady {
+	public static interface Ready {
 
 		public void result(Result result);
 	}
 
-	private static final class WorkItem {
+	private static final class WorkRequest {
 
-		public WorkItem(Signal signal, WorkReady ready) {
+		public WorkRequest(Signal signal, Ready ready) {
 			this.signal = signal;
 			this.callback = ready;
 		}
 
 		Signal signal;
 		
-		WorkReady callback;
+		Ready callback;
 		
 	}
 
@@ -54,7 +55,7 @@ public class Processor {
 		public void run() {
 			
 			try {
-				WorkItem item;
+				WorkRequest item;
 				while ((item = queue.take()) != null) {
 					final Result result = process(item.signal);
 					item.callback.result(result);
@@ -73,7 +74,7 @@ public class Processor {
 
 	private final Thread thread;
 
-	private final BlockingQueue<WorkItem> queue;
+	private final BlockingQueue<WorkRequest> queue;
 	
 	public Processor(int threads, SignalStore store) {
 		pool = Executors.newFixedThreadPool(threads);
@@ -89,7 +90,7 @@ public class Processor {
 		
 		final List<Future<Item>> localFutures = new ArrayList<>();
 		for (final Signal reference : store.getPrimaries()) {
-			final Future<Item> future = pool.submit(new WorkRequest(reference, signal));
+			final Future<Item> future = pool.submit(new WorkItem(reference, signal));
 			localFutures.add(future);
 		}
 		
@@ -107,8 +108,8 @@ public class Processor {
 		return result;
 	}
 	
-	public void request(Signal signal, WorkReady ready) {
-		queue.add(new WorkItem(signal, ready));
+	public void request(Signal signal, Ready ready) {
+		queue.add(new WorkRequest(signal, ready));
 	}
 
 	public void stop() {

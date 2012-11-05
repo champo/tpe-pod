@@ -30,6 +30,7 @@ import ar.edu.itba.pod.api.SignalProcessor;
 import ar.edu.itba.pod.legajo50453.message.BackupSignal;
 import ar.edu.itba.pod.legajo50453.message.MessageDispatcher;
 import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
+import ar.edu.itba.pod.legajo50453.worker.Processor;
 
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
@@ -166,6 +167,15 @@ public class Node implements SignalProcessor, SPNode {
 		
 		recieved.incrementAndGet();
 		
+		return process(signal);
+	}
+
+	/**
+	 * @param signal
+	 * @return
+	 */
+	private Result process(Signal signal) {
+
 		final List<Future<Result>> remoteResults = new ArrayList<>();
 		for (final Address address : currentView.getMembers()) {
 			
@@ -187,15 +197,12 @@ public class Node implements SignalProcessor, SPNode {
 				}
 				
 			} catch (InterruptedException | ExecutionException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				return null;
 			}
 		}
 		
 		return result;
 	}
-	
-	
 	
 	private final class MessageReciever extends ReceiverAdapter {
 		

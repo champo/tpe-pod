@@ -1,7 +1,7 @@
 /**
  * 
  */
-package ar.edu.itba.pod.legajo50453.mt;
+package ar.edu.itba.pod.legajo50453.worker;
 
 import java.util.concurrent.Callable;
 
@@ -14,13 +14,13 @@ import ar.edu.itba.pod.util.Immutable;
  *
  */
 @Immutable
-public class WorkRequest implements Callable<Item> {
+public class WorkItem implements Callable<Item> {
 	
 	private final Signal reference;
 	
 	private final Signal candidate;
 	
-	public WorkRequest(Signal reference, Signal candidate) {
+	public WorkItem(Signal reference, Signal candidate) {
 		this.reference = reference;
 		this.candidate = candidate;
 	}

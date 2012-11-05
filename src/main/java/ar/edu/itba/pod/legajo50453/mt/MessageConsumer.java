@@ -11,7 +11,7 @@ import ar.edu.itba.pod.legajo50453.message.AnswerableMessage;
 import ar.edu.itba.pod.legajo50453.message.BackupSignal;
 import ar.edu.itba.pod.legajo50453.message.MessageDispatcher;
 import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
-import ar.edu.itba.pod.legajo50453.mt.Processor.WorkReady;
+import ar.edu.itba.pod.legajo50453.worker.Processor;
 
 public class MessageConsumer implements Runnable {
 	
@@ -71,7 +71,7 @@ public class MessageConsumer implements Runnable {
 			}
 		} else if (object instanceof SimilarRequest) {
 			final SimilarRequest request = (SimilarRequest) object;
-			processor.request(request.getSignal(), new WorkReady() {
+			processor.request(request.getSignal(), new Processor.Ready() {
 				
 				@Override
 				public void result(Result result) {
