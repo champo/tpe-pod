@@ -4,9 +4,7 @@
 package ar.edu.itba.pod.legajo50453.mt;
 
 import java.rmi.RemoteException;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -23,14 +21,13 @@ import org.jgroups.View;
 
 import ar.edu.itba.pod.api.NodeStats;
 import ar.edu.itba.pod.api.Result;
-import ar.edu.itba.pod.api.Result.Item;
 import ar.edu.itba.pod.api.SPNode;
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
 import ar.edu.itba.pod.legajo50453.message.BackupSignal;
 import ar.edu.itba.pod.legajo50453.message.MessageDispatcher;
-import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
 import ar.edu.itba.pod.legajo50453.worker.Processor;
+import ar.edu.itba.pod.legajo50453.worker.WorkerPool;
 
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
@@ -64,7 +61,9 @@ public class Node implements SignalProcessor, SPNode {
 	private View currentView;
 
 	private final Processor processor;
-	
+
+	private final WorkerPool workerPool;
+
 	public Node(int threads) throws Exception {
 
 		channel = new JChannel("jgroups.xml");
@@ -74,9 +73,10 @@ public class Node implements SignalProcessor, SPNode {
 		dispatcher = new MessageDispatcher(channel);
 		
 		store = new SignalStore();
-		processor = new Processor(threads, store);
+		processor = new Processor(channel, dispatcher);
 		
-		consumer = new MessageConsumer(inboundMessages, store, dispatcher, processor);
+		workerPool = new WorkerPool(threads, store);
+		consumer = new MessageConsumer(inboundMessages, store, dispatcher, workerPool);
 		consumerThread = new Thread(consumer);
 		consumerThread.start();
 		
@@ -168,42 +168,14 @@ public class Node implements SignalProcessor, SPNode {
 		
 		recieved.incrementAndGet();
 		
-		return process(signal);
+		try {
+			return processor.process(signal).get();
+		} catch (InterruptedException | ExecutionException e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 
-	/**
-	 * @param signal
-	 * @return
-	 */
-	private Result process(Signal signal) {
-
-		final List<Future<Result>> remoteResults = new ArrayList<>();
-		for (final Address address : currentView.getMembers()) {
-			
-			if (address != channel.getAddress()) {
-				remoteResults.add(dispatcher.<Result>sendMessage(address, new SimilarRequest(signal)));
-			}
-		}
-		
-		Result result = processor.process(signal);
-		
-		for (final Future<Result> future : remoteResults) {
-			try {
-				final Result remoteResult = future.get();
-				if (remoteResult != null) {
-					
-					for (final Item item : remoteResult.items()) {
-						result = result.include(item);
-					}
-				}
-				
-			} catch (InterruptedException | ExecutionException e) {
-				return null;
-			}
-		}
-		
-		return result;
-	}
 	
 	private final class MessageReciever extends ReceiverAdapter {
 		

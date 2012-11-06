@@ -4,10 +4,11 @@ Short term todo list
  - permitir cancel de future de MessageDispatcher -- Done!
  - refactorear los pedidos de procesamiento por RMI
    - obtener un future
-   - del otro lado una queue de procesamiento que deriva a interfaces de procesamiento local y remotas (que entregan NotifiableFutures)
-   - rearmar el sistema de procesamiento local para que sea async
+   - mandar mensajes a todos incluido yo
+   - esperar respuestas
  - balancear el primario del add tambien
    - fucking hate that
+ - futureimpl is not thread safe
 
 Reglas para modo degradado:
 
@@ -21,3 +22,10 @@ Agregado de nodos:
  - elegir n/(k-1) primarias y backups, pasarlo al nuevo nodo
  - broadcast de stable una vez que pase todo y recibi acks
  - retorno a modo normal cuando recibi todos los broadcasts (usar FLUSH para asegurar que todos sepan bien que estan modo normal)
+
+
+Cosas random
+
+ - protocol FIFO pa orden de mensajes <= util para el add de una primary en otro nodo (bloque el add del otro lado, y no antiende el pedido de procesamiento hasta que ya esta agregada la señal)
+ - mandarte mensaje de pedido de procesamiento a vos mismo
+ - simplemente dejar de responder cosas para el clean exit

@@ -7,118 +7,183 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+
+import org.jgroups.Address;
+import org.jgroups.Channel;
+import org.jgroups.View;
+import org.jgroups.util.FutureListener;
+import org.jgroups.util.NotifyingFuture;
 
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.Result.Item;
 import ar.edu.itba.pod.api.Signal;
-import ar.edu.itba.pod.legajo50453.mt.SignalStore;
+import ar.edu.itba.pod.legajo50453.FutureImpl;
+import ar.edu.itba.pod.legajo50453.message.MessageDispatcher;
+import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
 
 /**
  * @author champo
  *
  */
-public class Processor {
+public final class Processor {
 	
-	/**
-	 * @author champo
-	 *
-	 */
-	public static interface Ready {
 
-		public void result(Result result);
-	}
+	private final MessageDispatcher dispatcher;
+	
+	private final BlockingQueue<WorkRequest> requests;
 
-	private static final class WorkRequest {
+	private final Channel channel;
+	
+	private final Thread runner;
 
-		public WorkRequest(Signal signal, Ready ready) {
-			this.signal = signal;
-			this.callback = ready;
-		}
-
-		Signal signal;
-		
-		Ready callback;
-		
-	}
-
-	/**
-	 * @author champo
-	 *
-	 */
-	private final class QueueConsumer implements Runnable {
-		
-		@Override
-		public void run() {
+	public Processor(Channel channel, MessageDispatcher dispatcher) {
+		this.dispatcher = dispatcher;
+		this.requests = new LinkedBlockingQueue<>();
+		this.channel = channel;
+		this.runner = new Thread(new Runnable() {
 			
-			try {
-				WorkRequest item;
-				while ((item = queue.take()) != null) {
-					final Result result = process(item.signal);
+			@Override
+			public void run() {
 					
-					try { 
-						item.callback.result(result);
-					} catch (final RuntimeException e) {
-						System.out.println("Got exception on callback:\n" + e);
+				try {
+					while (true) {
+						final WorkRequest request = requests.poll(1, TimeUnit.SECONDS);
+						if (request != null) {
+							work(request);
+						}
 					}
+					
+				} catch (final InterruptedException e) {
+					e.printStackTrace();
 				}
-			} catch (final InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			}
+		});
+	}
+	
+	public Future<Result> process(Signal reference) {
+		
+		final WorkRequest request = new WorkRequest();
+		final FutureResult future = new FutureResult(request);
+		
+		request.future = future;
+		request.reference = reference;
+		requests.add(request);
+		
+		return future;
+	}
+	
+
+	private void work(final WorkRequest request) {
+
+		
+		synchronized (request.lock) {
+			
+			final View currentView = channel.getView();
+			final ResultListener listener = new ResultListener(request);
+			
+			request.count = currentView.size();
+			request.remotes = new ArrayList<>();
+			
+			for (final Address address : currentView.getMembers()) {
+				final NotifyingFuture<Result> future = dispatcher.<Result>sendMessage(address, new SimilarRequest(request.reference));
+				future.setListener(listener);
+				request.remotes.add(future);
+			}
+		}
+		
+	}
+	
+	public void stop() {
+	}
+
+	private final class ResultListener implements FutureListener<Result> {
+
+		private final WorkRequest request;
+
+		private ResultListener(WorkRequest request) {
+			this.request = request;
+		}
+
+		@Override
+		public void futureDone(Future<Result> future) {
+			
+			synchronized (request.lock) {
+				
+				if (--request.count == 0) {
+					gotResult();
+				}
+			}
+		}
+
+		private void gotResult() {
+
+			Result result = new Result(request.reference);
+			for (final Future<Result> remote : request.remotes) {
+				try {
+					final Result remoteResult = remote.get();
+					if (remoteResult != null) {
+						
+						for (final Item item : remoteResult.items()) {
+							result = result.include(item);
+						}
+					}
+					
+				} catch (InterruptedException | ExecutionException e) {
+					abort(request);
+					requests.add(request);
+				}
 			}
 			
+			request.future.setResponse(result);
 		}
-	}
 
-	private final SignalStore store;
-	
-	private final ExecutorService pool;
-
-	private final Thread thread;
-
-	private final BlockingQueue<WorkRequest> queue;
-	
-	public Processor(int threads, SignalStore store) {
-		pool = Executors.newFixedThreadPool(threads);
-		this.store = store;
-		
-		queue = new LinkedBlockingDeque<>();
-		thread = new Thread(new QueueConsumer());
-		
-		thread.start();
 	}
 	
-	public Result process(Signal signal) {
+	private static void abort(WorkRequest request) {
 		
-		final List<Future<Item>> localFutures = new ArrayList<>();
-		for (final Signal reference : store.getPrimaries()) {
-			final Future<Item> future = pool.submit(new WorkItem(reference, signal));
-			localFutures.add(future);
-		}
-		
-		Result result = new Result(signal);
-		for (final Future<Item> future : localFutures) {
-			try {
-				result = result.include(future.get());
-			} catch (final InterruptedException e) {
-				e.printStackTrace();
-			} catch (final ExecutionException e) {
-				e.printStackTrace();
+		synchronized (request.lock) {
+			
+			for (final NotifyingFuture<Result> future : request.remotes) {
+				future.setListener(null);
+				future.cancel(true);
 			}
+			
+			request.remotes = null;
 		}
-		
-		return result;
-	}
-	
-	public void request(Signal signal, Ready ready) {
-		queue.add(new WorkRequest(signal, ready));
 	}
 
-	public void stop() {
-		//FIXME: Do sth
+	private static class WorkRequest {
+		
+		Object lock = new Object();
+
+		FutureResult future;
+		
+		Signal reference;
+		
+		int count;
+		
+		List<NotifyingFuture<Result>> remotes;
+		
+	}
+	
+	private static class FutureResult extends FutureImpl<Result> {
+
+		private final WorkRequest request;
+		
+		public FutureResult(WorkRequest request) {
+			super();
+			this.request = request;
+		}
+
+		@Override
+		protected boolean doCancel() {
+			abort(request);
+			return true;
+		}
+		
 	}
 
 }

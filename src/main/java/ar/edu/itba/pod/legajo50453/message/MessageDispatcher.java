@@ -4,16 +4,13 @@ import java.io.Serializable;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.jgroups.Address;
 import org.jgroups.Channel;
-import org.jgroups.util.FutureListener;
 import org.jgroups.util.NotifyingFuture;
+
+import ar.edu.itba.pod.legajo50453.FutureImpl;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -41,7 +38,7 @@ public class MessageDispatcher {
 		if (brokenFutures != null) {
 			for (final ResponseFuture<?> future : brokenFutures) {
 				futures.remove(future.getId());
-				future.nodeDisconnected();
+				future.aborted();
 			}
 		}
 	}
@@ -60,7 +57,7 @@ public class MessageDispatcher {
 			addressToFuture.remove(address, future);
 			futures.remove(id);
 			
-			future.nodeDisconnected(e);
+			future.aborted(e);
 		}
 		
 		return future;
@@ -88,21 +85,9 @@ public class MessageDispatcher {
 		return false;
 	}
 
-	private class ResponseFuture<T> implements NotifyingFuture<T> {
-		
-		private T response;
-		
-		private final CountDownLatch ready = new CountDownLatch(1);
-		
-		private boolean disconnected;
-		
-		private boolean cancelled;
-		
-		private Exception cause;
+	public class ResponseFuture<T> extends FutureImpl<T> {
 		
 		private final long id;
-
-		private FutureListener<T> listener;
 
 		private final Address address;
 		
@@ -120,94 +105,8 @@ public class MessageDispatcher {
 			return id;
 		}
 		
-		private void setResponse(Serializable response) {
-			
-			if (ready.getCount() == 0 || disconnected) {
-				throw new IllegalStateException();
-			}
-			
-			try {
-				this.response = (T) response;
-			} catch (final ClassCastException e) {
-				this.response = null;
-			}
-			
-			ready.countDown();
-			if (listener != null) {
-				listener.futureDone(this);
-			}
-		}
-		
-		private void nodeDisconnected(Exception e) {
-			
-			if (ready.getCount() != 0) {
-				disconnected = true;
-				cause = e;
-			}
-			
-			ready.countDown();
-		}
-
-		private void nodeDisconnected() {
-			
-			if (ready.getCount() != 0) {
-				disconnected = true;
-			}
-			ready.countDown();
-		}
-
-		@Override
-		public boolean cancel(boolean mayInterruptIfRunning) {
-			
-			if (!mayInterruptIfRunning || isDone()) {
-				return false;
-			}
-
+		public boolean doCancel() {
 			return cancelFuture(this);
-		}
-
-		@Override
-		public boolean isCancelled() {
-			return cancelled;
-		}
-
-		@Override
-		public boolean isDone() {
-			return ready.getCount() == 0;
-		}
-
-		@Override
-		public T get() throws InterruptedException, ExecutionException {
-			
-			ready.await();
-			
-			if (disconnected) {
-				throw new ExecutionException("The reciepient disconnected before answering", cause);
-			}
-			
-			return response;
-		}
-
-		@Override
-		public T get(long timeout, TimeUnit unit) throws InterruptedException,
-				ExecutionException, TimeoutException {
-			
-			if (ready.await(timeout, unit)) {
-				return get();
-			}
-			
-			throw new TimeoutException();
-		}
-
-		@Override
-		public NotifyingFuture<T> setListener(FutureListener<T> listener) {
-			
-			if (isDone()) {
-				listener.futureDone(this);
-			}
-			this.listener = listener;
-			
-			return this;
 		}
 
 	}

@@ -11,7 +11,7 @@ import ar.edu.itba.pod.legajo50453.message.AnswerableMessage;
 import ar.edu.itba.pod.legajo50453.message.BackupSignal;
 import ar.edu.itba.pod.legajo50453.message.MessageDispatcher;
 import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
-import ar.edu.itba.pod.legajo50453.worker.Processor;
+import ar.edu.itba.pod.legajo50453.worker.WorkerPool;
 
 public class MessageConsumer implements Runnable {
 	
@@ -21,9 +21,9 @@ public class MessageConsumer implements Runnable {
 	
 	private final MessageDispatcher dispatcher;
 	
-	private final Processor processor;
+	private final WorkerPool processor;
 	
-	public MessageConsumer(BlockingQueue<Message> queue, SignalStore store, MessageDispatcher dispatcher, Processor processor) {
+	public MessageConsumer(BlockingQueue<Message> queue, SignalStore store, MessageDispatcher dispatcher, WorkerPool processor) {
 		super();
 		this.queue = queue;
 		this.store = store;
@@ -74,7 +74,7 @@ public class MessageConsumer implements Runnable {
 			}
 		} else if (object instanceof SimilarRequest) {
 			final SimilarRequest request = (SimilarRequest) object;
-			processor.request(request.getSignal(), new Processor.Ready() {
+			processor.request(request.getSignal(), new WorkerPool.Ready() {
 				
 				@Override
 				public void result(Result result) {
