@@ -9,6 +9,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.jgroups.Address;
 import org.jgroups.Channel;
 import org.jgroups.util.NotifyingFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ar.edu.itba.pod.legajo50453.FutureImpl;
 
@@ -17,6 +19,8 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 
 public class MessageDispatcher {
+	
+	final static Logger logger = LoggerFactory.getLogger(MessageDispatcher.class);
 
 	private final AtomicLong idGenerator = new AtomicLong(0);
 	
@@ -69,6 +73,8 @@ public class MessageDispatcher {
 		if (future != null) {
 			addressToFuture.remove(origin, future);
 			future.setResponse(response.getPayload());
+		} else {
+			logger.warn("Got future-less response... weird shit man");
 		}
 	}
 	
@@ -105,6 +111,7 @@ public class MessageDispatcher {
 			return id;
 		}
 		
+		@Override
 		public boolean doCancel() {
 			return cancelFuture(this);
 		}

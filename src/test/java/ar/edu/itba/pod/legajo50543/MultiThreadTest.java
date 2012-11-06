@@ -40,6 +40,7 @@ public class MultiThreadTest {
 	public void setup() throws Exception {
 		this.reference = new StandaloneSignalProcessor();
 		toTest = init();
+		toTest.join("test-cluster");
 		src = new RandomSource(12345);
 	}
 	
@@ -54,10 +55,7 @@ public class MultiThreadTest {
 	 * Initialize or get a reference to the signal processor to be tested.
 	 */
 	protected Node init() throws Exception {
-		final Node node = new Node(4);
-		node.join("test-cluster");
-		
-		return node;
+		return new Node(4);
 	}
 	
 	@Test

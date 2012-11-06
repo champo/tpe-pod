@@ -12,6 +12,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.Result.Item;
 import ar.edu.itba.pod.api.Signal;
@@ -22,6 +25,8 @@ import ar.edu.itba.pod.legajo50453.mt.SignalStore;
  *
  */
 public final class WorkerPool {
+	
+	final static Logger logger = LoggerFactory.getLogger(WorkerPool.class);
 	
 	public static interface Ready {
 
@@ -61,6 +66,7 @@ public final class WorkerPool {
 						System.out.println("Got exception on callback:\n" + e);
 					}
 				}
+				
 			} catch (final InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -68,7 +74,7 @@ public final class WorkerPool {
 			
 		}
 	}
-
+	
 	private final SignalStore store;
 	
 	private final ExecutorService pool;
@@ -89,6 +95,7 @@ public final class WorkerPool {
 	
 	public Result process(Signal signal) {
 		
+		logger.debug("Comparing signal", signal);
 		final List<Future<Item>> localFutures = new ArrayList<>();
 		for (final Signal reference : store.getPrimaries()) {
 			final Future<Item> future = pool.submit(new WorkItem(reference, signal));
@@ -111,10 +118,6 @@ public final class WorkerPool {
 	
 	public void request(Signal signal, Ready ready) {
 		queue.add(new WorkRequest(signal, ready));
-	}
-
-	public void stop() {
-		//FIXME: Do sth
 	}
 
 }

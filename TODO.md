@@ -9,6 +9,8 @@ Short term todo list
  - balancear el primario del add tambien
    - fucking hate that
  - futureimpl is not thread safe -- Done!
+ - bancarse procesamiento en sigle node mode -- Done!
+ - stop de processor
 
 Reglas para modo degradado:
 
@@ -22,7 +24,6 @@ Agregado de nodos:
  - elegir n/(k-1) primarias y backups, pasarlo al nuevo nodo
  - broadcast de stable una vez que pase todo y recibi acks
  - retorno a modo normal cuando recibi todos los broadcasts (usar FLUSH para asegurar que todos sepan bien que estan modo normal)
-
 
 Cosas random
 

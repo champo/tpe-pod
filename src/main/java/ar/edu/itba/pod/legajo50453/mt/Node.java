@@ -18,6 +18,8 @@ import org.jgroups.JChannel;
 import org.jgroups.Message;
 import org.jgroups.ReceiverAdapter;
 import org.jgroups.View;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ar.edu.itba.pod.api.NodeStats;
 import ar.edu.itba.pod.api.Result;
@@ -37,6 +39,10 @@ import com.google.common.collect.Sets.SetView;
  *
  */
 public class Node implements SignalProcessor, SPNode {
+	
+	final static Logger logger = LoggerFactory.getLogger(Node.class);
+
+	private final Object channelLock = new Object();
 
 	private final MessageConsumer consumer;
 	
@@ -84,48 +90,69 @@ public class Node implements SignalProcessor, SPNode {
 
 	@Override
 	public void join(String clusterName) throws RemoteException {
+		logger.info("Joining cluster " + clusterName);
 		suicide = false;
 		
-		try {
-			channel.connect(clusterName);
-		} catch (final Exception e) {
-			e.printStackTrace();
+		synchronized (channelLock) {
+			try {
+				channel.connect(clusterName);
+			} catch (final Exception e) {
+				logger.error("Failed to connect to cluster", e);
+			}
 		}
 	}
 
 	@Override
 	public void exit() throws RemoteException {
+
+		logger.info("Leaving cluster");
 		suicide = true;
 		
 		processor.stop();
 		store.empty();
 		recieved.set(0);
-		channel.disconnect();
+			
+		synchronized (channelLock) {
+			currentView = null;
+			channel.disconnect();
+		}
 	}
 
 	@Override
 	public NodeStats getStats() throws RemoteException {
 		
 		boolean degraded = true;
-		if (channel.isConnected()) {
+		synchronized (channelLock) {
 			
-			final int nodes = channel.getView().size();
-			
-			if (nodes > 1 && nodes == stableNodes) {
-				degraded = false;
+			if (channel.isConnected()) {
+				
+				final int nodes = channel.getView().size();
+				
+				if (nodes > 1 && nodes == stableNodes) {
+					degraded = false;
+				}
 			}
 		}
 		
-		return new NodeStats(channel.getName(), recieved.get(), store.getPrimaryCount(), store.getBackupCount(), degraded);
+		final NodeStats stats = new NodeStats(channel.getName(), recieved.get(), store.getPrimaryCount(), store.getBackupCount(), degraded);
+		logger.debug("getStats(): ", new NodeStatsPrinter(stats));
+		return stats;
 	}
 
 	@Override
 	public void add(Signal signal) throws RemoteException {
 		
+		logger.debug("Adding signal", signal);
 		//TODO: Randomize the primary add
-		if (store.add(signal) && currentView.size() > 1) {
-			// The signal is new enough, let's back it up
-			sendBackup(signal);
+		if (store.add(signal)) {
+
+			synchronized (channelLock) {
+				
+				if (currentView != null && currentView.size() > 1) {
+					// The signal is new enough, let's back it up
+					sendBackup(signal);
+				}
+			}
 		}
 			
 	}
@@ -169,7 +196,13 @@ public class Node implements SignalProcessor, SPNode {
 		recieved.incrementAndGet();
 		
 		try {
-			return processor.process(signal).get();
+			logger.debug("Processing signal", signal);
+			if (channel.isConnected()) {
+				return processor.process(signal).get();
+			} else {
+				return workerPool.process(signal);
+			}
+			
 		} catch (InterruptedException | ExecutionException e) {
 			e.printStackTrace();
 			return null;
@@ -187,15 +220,20 @@ public class Node implements SignalProcessor, SPNode {
 		@Override
 		public void viewAccepted(View view) {
 			
+			logger.debug("A new view is in town");
+			
 			if (currentView == null) {
 				currentView = view;
 				return;
 			}
 			
 			final SetView<Address> difference = Sets.symmetricDifference(new HashSet<>(currentView.getMembers()), new HashSet<>(view.getMembers()));
+			
+			logger.info("View difference", difference);
 			currentView = view;
 			if (difference.size() > 1) {
 				// WERE ALL DOOMED
+				logger.error("Got more than one difference, humped");
 				throw new RuntimeException();
 			}
 			

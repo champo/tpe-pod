@@ -16,6 +16,8 @@ import org.jgroups.Channel;
 import org.jgroups.View;
 import org.jgroups.util.FutureListener;
 import org.jgroups.util.NotifyingFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.Result.Item;
@@ -29,7 +31,8 @@ import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
  *
  */
 public final class Processor {
-	
+
+	final static Logger logger = LoggerFactory.getLogger(Processor.class);
 
 	private final MessageDispatcher dispatcher;
 	
@@ -61,6 +64,8 @@ public final class Processor {
 				}
 			}
 		});
+		
+		this.runner.start();
 	}
 	
 	public Future<Result> process(Signal reference) {
@@ -77,9 +82,9 @@ public final class Processor {
 	
 
 	private void work(final WorkRequest request) {
-
 		
 		synchronized (request.lock) {
+			logger.info("Processing work request", request);
 			
 			final View currentView = channel.getView();
 			final ResultListener listener = new ResultListener(request);
@@ -88,10 +93,12 @@ public final class Processor {
 			request.remotes = new ArrayList<>();
 			
 			for (final Address address : currentView.getMembers()) {
+				logger.debug("Requesting order to " + address);
 				final NotifyingFuture<Result> future = dispatcher.<Result>sendMessage(address, new SimilarRequest(request.reference));
 				future.setListener(listener);
 				request.remotes.add(future);
 			}
+			logger.debug("Requested all the remote orders");
 		}
 		
 	}
@@ -112,6 +119,7 @@ public final class Processor {
 			
 			synchronized (request.lock) {
 				
+				logger.debug("Need " + request.count + " responses, got one");
 				if (--request.count == 0) {
 					gotResult();
 				}
@@ -120,6 +128,7 @@ public final class Processor {
 
 		private void gotResult() {
 
+			logger.debug("Joining results");
 			Result result = new Result(request.reference);
 			for (final Future<Result> remote : request.remotes) {
 				try {
@@ -132,6 +141,7 @@ public final class Processor {
 					}
 					
 				} catch (InterruptedException | ExecutionException e) {
+					logger.error("woaaaah things got interesting", e);
 					abort(request);
 					requests.add(request);
 				}
@@ -166,6 +176,16 @@ public final class Processor {
 		int count;
 		
 		List<NotifyingFuture<Result>> remotes;
+
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		public String toString() {
+
+			return "WorkRequest [reference=" + reference + ", count=" + count + ", remotes="
+					+ remotes + "]";
+		}
 		
 	}
 	

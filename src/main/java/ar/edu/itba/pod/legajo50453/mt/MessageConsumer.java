@@ -4,6 +4,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.jgroups.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.legajo50453.message.AnswerMessage;
@@ -15,20 +17,22 @@ import ar.edu.itba.pod.legajo50453.worker.WorkerPool;
 
 public class MessageConsumer implements Runnable {
 	
+	final static Logger logger = LoggerFactory.getLogger(MessageConsumer.class);
+	
 	private final BlockingQueue<Message> queue;
 	
 	private final SignalStore store;
 	
 	private final MessageDispatcher dispatcher;
 	
-	private final WorkerPool processor;
+	private final WorkerPool workerPool;
 	
 	public MessageConsumer(BlockingQueue<Message> queue, SignalStore store, MessageDispatcher dispatcher, WorkerPool processor) {
 		super();
 		this.queue = queue;
 		this.store = store;
 		this.dispatcher = dispatcher;
-		this.processor = processor;
+		this.workerPool = processor;
 	}
 
 	@Override
@@ -40,11 +44,14 @@ public class MessageConsumer implements Runnable {
 				final Message msg = queue.poll(1, TimeUnit.SECONDS);
 				if (msg != null) {
 
+					logger.debug("Inbound message", msg);
+					
 					try {
 						final Object object = msg.getObject();
 						if (object instanceof AnswerableMessage) {
 							handleMessage(msg);
 						} else if (object instanceof AnswerMessage) {
+							logger.debug("Giving answer to dispatcher", object);
 							dispatcher.processResponse(msg.getSrc(), (AnswerMessage) object);
 						}
 					} catch (final RuntimeException e) {
@@ -74,12 +81,13 @@ public class MessageConsumer implements Runnable {
 			}
 		} else if (object instanceof SimilarRequest) {
 			final SimilarRequest request = (SimilarRequest) object;
-			processor.request(request.getSignal(), new WorkerPool.Ready() {
+			workerPool.request(request.getSignal(), new WorkerPool.Ready() {
 				
 				@Override
 				public void result(Result result) {
 				
 					try {
+						logger.debug("Returning process request", result);
 						dispatcher.respondTo(msg.getSrc(), answerable.getId(), result);
 					} catch (final Exception e) {
 						// TODO Auto-generated catch block
