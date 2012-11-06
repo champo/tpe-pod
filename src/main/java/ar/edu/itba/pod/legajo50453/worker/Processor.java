@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -36,36 +37,27 @@ public final class Processor {
 
 	private final MessageDispatcher dispatcher;
 	
-	private final BlockingQueue<WorkRequest> requests;
+	private final LinkedBlockingDeque<WorkRequest> requests;
+	
+	private final BlockingQueue<WorkRequest> working;
 
 	private final Channel channel;
 	
-	private final Thread runner;
+	private Thread runner;
 
 	public Processor(Channel channel, MessageDispatcher dispatcher) {
 		this.dispatcher = dispatcher;
-		this.requests = new LinkedBlockingQueue<>();
+		this.requests = new LinkedBlockingDeque<>();
+		this.working = new LinkedBlockingQueue<>();
 		this.channel = channel;
-		this.runner = new Thread(new Runnable() {
-			
-			@Override
-			public void run() {
-					
-				try {
-					while (true) {
-						final WorkRequest request = requests.poll(1, TimeUnit.SECONDS);
-						if (request != null) {
-							work(request);
-						}
-					}
-					
-				} catch (final InterruptedException e) {
-					e.printStackTrace();
-				}
-			}
-		});
+	}
+
+	public void start() {
 		
-		this.runner.start();
+		if (runner == null) {
+			runner = new Thread(new RequestConsumer());
+			runner.start();
+		}
 	}
 	
 	public Future<Result> process(Signal reference) {
@@ -80,11 +72,11 @@ public final class Processor {
 		return future;
 	}
 	
-
 	private void work(final WorkRequest request) {
 		
 		synchronized (request.lock) {
 			logger.info("Processing work request", request);
+			working.add(request);
 			
 			final View currentView = channel.getView();
 			final ResultListener listener = new ResultListener(request);
@@ -103,7 +95,57 @@ public final class Processor {
 		
 	}
 	
+	private static void abort(WorkRequest request) {
+		
+		
+		synchronized (request.lock) {
+			
+			for (final NotifyingFuture<Result> future : request.remotes) {
+				future.setListener(null);
+				future.cancel(true);
+			}
+			
+			request.remotes = null;
+		}
+	}
+	
 	public void stop() {
+		
+		if (runner != null) {
+			requests.clear();
+			runner.interrupt();
+
+			try {
+				runner.join();
+			} catch (final InterruptedException e) {
+			} finally {
+				for (final WorkRequest request : working) {
+					abort(request);
+				}
+			
+				working.clear();
+				runner = null;
+			}
+		}
+	}
+
+	private final class RequestConsumer implements Runnable {
+		
+		@Override
+		public void run() {
+				
+			try {
+				while (true) {
+					final WorkRequest request = requests.poll(1, TimeUnit.SECONDS);
+					if (request != null) {
+						work(request);
+					}
+				}
+				
+			} catch (final InterruptedException e) {
+				logger.debug("Killing consumer", e);
+			}
+		}
 	}
 
 	private final class ResultListener implements FutureListener<Result> {
@@ -150,19 +192,6 @@ public final class Processor {
 			request.future.setResponse(result);
 		}
 
-	}
-	
-	private static void abort(WorkRequest request) {
-		
-		synchronized (request.lock) {
-			
-			for (final NotifyingFuture<Result> future : request.remotes) {
-				future.setListener(null);
-				future.cancel(true);
-			}
-			
-			request.remotes = null;
-		}
 	}
 
 	private static class WorkRequest {

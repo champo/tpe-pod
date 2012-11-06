@@ -10,7 +10,7 @@ Short term todo list
    - fucking hate that
  - futureimpl is not thread safe -- Done!
  - bancarse procesamiento en sigle node mode -- Done!
- - stop de processor
+ - stop de processor -- Done!
 
 Reglas para modo degradado:
 

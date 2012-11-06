@@ -95,6 +95,7 @@ public class Node implements SignalProcessor, SPNode {
 		
 		synchronized (channelLock) {
 			try {
+				processor.start();
 				channel.connect(clusterName);
 			} catch (final Exception e) {
 				logger.error("Failed to connect to cluster", e);
