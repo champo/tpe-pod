@@ -49,7 +49,7 @@ public class MessageDispatcher {
 	public <T> NotifyingFuture<T> sendMessage(Address address, Serializable obj) {
 		
 		final long id = idGenerator.getAndIncrement();
-		final ResponseFuture<T> future = new ResponseFuture<T>(id);
+		final ResponseFuture<T> future = new ResponseFuture<T>(id, address);
 		
 		addressToFuture.put(address, future);
 		futures.put(id, future);
@@ -78,8 +78,17 @@ public class MessageDispatcher {
 	public void respondTo(Address address, long id, Serializable payload) throws Exception {
 		channel.send(address, new AnswerMessage(id, payload));
 	}
+	
+	private <T> boolean cancelFuture(ResponseFuture<T> future) {
+		if (futures.remove(future.getId()) != null) {
+			addressToFuture.remove(future.getAddress(), future);
+			return true;
+		}
+		
+		return false;
+	}
 
-	private static class ResponseFuture<T> implements NotifyingFuture<T> {
+	private class ResponseFuture<T> implements NotifyingFuture<T> {
 		
 		private T response;
 		
@@ -87,22 +96,31 @@ public class MessageDispatcher {
 		
 		private boolean disconnected;
 		
+		private boolean cancelled;
+		
 		private Exception cause;
 		
 		private final long id;
 
 		private FutureListener<T> listener;
+
+		private final Address address;
 		
-		public ResponseFuture(long id) {
+		private ResponseFuture(long id, Address address) {
 			super();
 			this.id = id;
+			this.address = address;
 		}
 
-		public long getId() {
+		private Address getAddress() {
+			return address;
+		}
+
+		private long getId() {
 			return id;
 		}
 		
-		void setResponse(Serializable response) {
+		private void setResponse(Serializable response) {
 			
 			if (ready.getCount() == 0 || disconnected) {
 				throw new IllegalStateException();
@@ -120,7 +138,7 @@ public class MessageDispatcher {
 			}
 		}
 		
-		public void nodeDisconnected(Exception e) {
+		private void nodeDisconnected(Exception e) {
 			
 			if (ready.getCount() != 0) {
 				disconnected = true;
@@ -130,7 +148,7 @@ public class MessageDispatcher {
 			ready.countDown();
 		}
 
-		public void nodeDisconnected() {
+		private void nodeDisconnected() {
 			
 			if (ready.getCount() != 0) {
 				disconnected = true;
@@ -140,12 +158,17 @@ public class MessageDispatcher {
 
 		@Override
 		public boolean cancel(boolean mayInterruptIfRunning) {
-			return false;
+			
+			if (!mayInterruptIfRunning || isDone()) {
+				return false;
+			}
+
+			return cancelFuture(this);
 		}
 
 		@Override
 		public boolean isCancelled() {
-			return false;
+			return cancelled;
 		}
 
 		@Override
