@@ -8,6 +8,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import net.jcip.annotations.ThreadSafe;
+
 import org.jgroups.util.FutureListener;
 import org.jgroups.util.NotifyingFuture;
 
@@ -15,6 +17,7 @@ import org.jgroups.util.NotifyingFuture;
  * @author champo
  * 
  */
+@ThreadSafe
 public abstract class FutureImpl<T> implements NotifyingFuture<T> {
 	
 	private final Object lock = new Object();
@@ -90,9 +93,9 @@ public abstract class FutureImpl<T> implements NotifyingFuture<T> {
 	@Override
 	public T get() throws InterruptedException, ExecutionException {
 
+		ready.await();
+		
 		synchronized (lock) {
-			ready.await();
-			
 			if (aborted) {
 				throw new ExecutionException("The reciepient disconnected before answering", cause);
 			}
@@ -104,14 +107,11 @@ public abstract class FutureImpl<T> implements NotifyingFuture<T> {
 	@Override
 	public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
 
-		synchronized (lock) {
-
-			if (ready.await(timeout, unit)) {
-				return get();
-			}
-			
-			throw new TimeoutException();
+		if (ready.await(timeout, unit)) {
+			return get();
 		}
+			
+		throw new TimeoutException();
 	}
 
 	@Override
