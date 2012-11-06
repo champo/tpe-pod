@@ -2,13 +2,13 @@ Short term todo list
 
  - Refactor de MessageDispatcher para permitir notifacion async de respuesta -- Done!
  - permitir cancel de future de MessageDispatcher -- Done!
- - refactorear los pedidos de procesamiento por RMI
+ - refactorear los pedidos de procesamiento por RMI -- Done!
    - obtener un future
    - mandar mensajes a todos incluido yo
    - esperar respuestas
  - balancear el primario del add tambien
    - fucking hate that
- - futureimpl is not thread safe
+ - futureimpl is not thread safe -- Done!
 
 Reglas para modo degradado:
 
@@ -27,5 +27,5 @@ Agregado de nodos:
 Cosas random
 
  - protocol FIFO pa orden de mensajes <= util para el add de una primary en otro nodo (bloque el add del otro lado, y no antiende el pedido de procesamiento hasta que ya esta agregada la señal)
- - mandarte mensaje de pedido de procesamiento a vos mismo
+ - mandarte mensaje de pedido de procesamiento a vos mismo -- Done!
  - simplemente dejar de responder cosas para el clean exit

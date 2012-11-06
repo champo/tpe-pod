@@ -16,6 +16,8 @@ import org.jgroups.util.NotifyingFuture;
  * 
  */
 public abstract class FutureImpl<T> implements NotifyingFuture<T> {
+	
+	private final Object lock = new Object();
 
 	private T response;
 	
@@ -31,17 +33,20 @@ public abstract class FutureImpl<T> implements NotifyingFuture<T> {
 
 	public void setResponse(Object response) {
 		
-		if (ready.getCount() == 0 || aborted) {
-			throw new IllegalStateException();
+		synchronized (lock) {
+			
+			if (ready.getCount() == 0 || aborted) {
+				throw new IllegalStateException();
+			}
+			
+			try {
+				this.response = (T) response;
+			} catch (final ClassCastException e) {
+				this.response = null;
+			}
+			
+			ready();
 		}
-		
-		try {
-			this.response = (T) response;
-		} catch (final ClassCastException e) {
-			this.response = null;
-		}
-		
-		ready();
 	}
 
 	private void ready() {
@@ -54,16 +59,22 @@ public abstract class FutureImpl<T> implements NotifyingFuture<T> {
 
 	public void aborted(Exception e) {
 		
-		if (ready.getCount() != 0) {
-			aborted = true;
-			cause = e;
+		synchronized (lock) {
+			
+			if (ready.getCount() != 0) {
+				aborted = true;
+				cause = e;
+			}
+			
+			ready();
 		}
-		
-		ready();
 	}
 
 	public void aborted() {
-		aborted(null);
+		
+		synchronized (lock) {
+			aborted(null);
+		}
 	}
 
 	@Override
@@ -78,47 +89,61 @@ public abstract class FutureImpl<T> implements NotifyingFuture<T> {
 
 	@Override
 	public T get() throws InterruptedException, ExecutionException {
-		
-		ready.await();
-		
-		if (aborted) {
-			throw new ExecutionException("The reciepient disconnected before answering", cause);
+
+		synchronized (lock) {
+			ready.await();
+			
+			if (aborted) {
+				throw new ExecutionException("The reciepient disconnected before answering", cause);
+			}
+			
+			return response;
 		}
-		
-		return response;
 	}
 
 	@Override
 	public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-		
-		if (ready.await(timeout, unit)) {
-			return get();
+
+		synchronized (lock) {
+
+			if (ready.await(timeout, unit)) {
+				return get();
+			}
+			
+			throw new TimeoutException();
 		}
-		
-		throw new TimeoutException();
 	}
 
 	@Override
 	public NotifyingFuture<T> setListener(FutureListener<T> listener) {
 		
-		if (isDone() && listener != null) {
-			listener.futureDone(this);
+		synchronized (lock) {
+			
+			if (isDone() && listener != null) {
+				listener.futureDone(this);
+			}
+			this.listener = listener;
+			
+			return this;
 		}
-		this.listener = listener;
-		
-		return this;
 	}
 
 	@Override
 	public boolean cancel(boolean mayInterruptIfRunning) {
-		
-		if (!mayInterruptIfRunning || isDone()) {
-			return false;
+
+		synchronized (lock) {
+			
+			if (!mayInterruptIfRunning || isDone()) {
+				return false;
+			}
+			
+			cancelled = doCancel();
+			if (cancelled) {
+				ready();
+			}
+			
+			return cancelled;
 		}
-	
-		cancelled = doCancel();
-		ready();
-		return cancelled;
 	}
 
 	protected abstract boolean doCancel();
