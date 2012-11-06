@@ -6,13 +6,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.jgroups.Address;
 import org.jgroups.Channel;
+import org.jgroups.util.FutureListener;
+import org.jgroups.util.NotifyingFuture;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -45,7 +46,7 @@ public class MessageDispatcher {
 		}
 	}
 
-	public <T> Future<T> sendMessage(Address address, Serializable obj) {
+	public <T> NotifyingFuture<T> sendMessage(Address address, Serializable obj) {
 		
 		final long id = idGenerator.getAndIncrement();
 		final ResponseFuture<T> future = new ResponseFuture<T>(id);
@@ -78,7 +79,7 @@ public class MessageDispatcher {
 		channel.send(address, new AnswerMessage(id, payload));
 	}
 
-	private static class ResponseFuture<T> implements Future<T> {
+	private static class ResponseFuture<T> implements NotifyingFuture<T> {
 		
 		private T response;
 		
@@ -89,6 +90,8 @@ public class MessageDispatcher {
 		private Exception cause;
 		
 		private final long id;
+
+		private FutureListener<T> listener;
 		
 		public ResponseFuture(long id) {
 			super();
@@ -112,6 +115,9 @@ public class MessageDispatcher {
 			}
 			
 			ready.countDown();
+			if (listener != null) {
+				listener.futureDone(this);
+			}
 		}
 		
 		public void nodeDisconnected(Exception e) {
@@ -168,6 +174,17 @@ public class MessageDispatcher {
 			}
 			
 			throw new TimeoutException();
+		}
+
+		@Override
+		public NotifyingFuture<T> setListener(FutureListener<T> listener) {
+			
+			if (isDone()) {
+				listener.futureDone(this);
+			}
+			this.listener = listener;
+			
+			return this;
 		}
 
 	}
