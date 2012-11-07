@@ -38,7 +38,7 @@ Add:
 Remove:
 
  - disparar cambio de topologia -- Done!
- - las del nodo caido si es un drop
+ - las del nodo caido si es un drop -- Done!
 
 Cosas random
 

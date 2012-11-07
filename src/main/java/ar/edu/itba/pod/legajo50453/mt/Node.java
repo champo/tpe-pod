@@ -234,7 +234,7 @@ public class Node implements SignalProcessor, SPNode {
 				System.exit(1);
 			} else if (removed.size() == 1) {
 				final Address change = removed.iterator().next();
-				topologyChange(new NodeDisconnectSelector(store, change));
+				topologyChange(new NodeDisconnectSelector(store, change, channel.getAddress()));
 			}
 			
 			//TODO: Handle joins

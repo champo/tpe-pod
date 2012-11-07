@@ -1,5 +1,6 @@
 package ar.edu.itba.pod.legajo50453.mt;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -12,6 +13,7 @@ import org.jgroups.Address;
 
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.legajo50453.message.SignalData;
+import ar.edu.itba.pod.legajo50453.mt.NodeDisconnectSelector.KnownNodeSignals;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
@@ -129,5 +131,33 @@ public class SignalStore {
 		
 	}
 
+	public KnownNodeSignals getKnownSignalsFor(Address node, Address me) {
+		
+		writeLock.lock();
+		final Collection<Signal> signals = knownSignals.removeAll(node);
+		writeLock.unlock();
+
+		final Set<SignalData> amPrimary = new HashSet<>();
+		final Set<SignalData> amBackup = new HashSet<>();
+		
+		readLock.lock();
+		
+		for (final Signal signal : signals) {
+			
+			final SignalData data = new SignalData(signal, me);
+			if (primaries.contains(signal)) {
+				amPrimary.add(data);
+			} else {
+				amBackup.add(data);
+			}
+			
+		}
+		
+		readLock.unlock();
+		
+		return new KnownNodeSignals(amBackup, amPrimary);
+	}
+
+	
 
 }
