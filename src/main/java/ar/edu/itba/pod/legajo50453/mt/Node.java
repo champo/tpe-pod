@@ -227,6 +227,8 @@ public class Node implements SignalProcessor, SPNode {
 			final Set<Address> currentSet = new HashSet<>(currentView.getMembers());
 			final Set<Address> newSet = new HashSet<>(view.getMembers());
 			
+			currentView = view;
+			
 			final SetView<Address> removed = Sets.difference(currentSet, newSet);
 				
 			if (removed.size() > 1) {
