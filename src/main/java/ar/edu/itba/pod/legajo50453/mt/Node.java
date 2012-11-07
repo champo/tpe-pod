@@ -50,8 +50,6 @@ public class Node implements SignalProcessor, SPNode {
 	
 	private final Random rnd = new Random();
 	
-	private boolean suicide;
-	
 	private int stableNodes;
 
 	private final BlockingQueue<Message> inboundMessages;
@@ -89,7 +87,6 @@ public class Node implements SignalProcessor, SPNode {
 	@Override
 	public void join(String clusterName) throws RemoteException {
 		logger.info("Joining cluster " + clusterName);
-		suicide = false;
 		
 		processor.start();
 		try {
@@ -101,9 +98,7 @@ public class Node implements SignalProcessor, SPNode {
 
 	@Override
 	public void exit() throws RemoteException {
-
 		logger.info("Leaving cluster");
-		suicide = true;
 		
 		processor.stop();
 		store.empty();
@@ -135,7 +130,7 @@ public class Node implements SignalProcessor, SPNode {
 
 	@Override
 	public void add(Signal signal) throws RemoteException {
-		
+
 		logger.debug("Adding signal", signal);
 		//TODO: Randomize the primary add
 		if (store.add(signal)) {
@@ -146,7 +141,7 @@ public class Node implements SignalProcessor, SPNode {
 				sendBackup(signal);
 			}
 		}
-			
+
 	}
 
 	private void sendBackup(Signal signal) {
@@ -179,10 +174,6 @@ public class Node implements SignalProcessor, SPNode {
 		
 		if (null == signal) {
 			throw new IllegalArgumentException();
-		}
-		
-		if (suicide) {
-			return new Result(signal);
 		}
 		
 		recieved.incrementAndGet();
