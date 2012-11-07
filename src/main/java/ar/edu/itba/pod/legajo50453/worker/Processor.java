@@ -4,7 +4,9 @@
 package ar.edu.itba.pod.legajo50453.worker;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -40,7 +42,7 @@ public final class Processor {
 	
 	private final LinkedBlockingDeque<WorkRequest> requests;
 	
-	private final List<WorkRequest> working;
+	private final Set<WorkRequest> working;
 
 	private final Channel channel;
 	
@@ -53,7 +55,7 @@ public final class Processor {
 	public Processor(Channel channel, MessageDispatcher dispatcher) {
 		this.dispatcher = dispatcher;
 		this.requests = new LinkedBlockingDeque<>();
-		this.working = new ArrayList<>();
+		this.working = new HashSet<>();
 		this.channel = channel;
 		this.permit = new Semaphore(0);
 	}
@@ -118,9 +120,13 @@ public final class Processor {
 		
 	}
 	
-	private static void abort(WorkRequest request) {
+	private static boolean abort(WorkRequest request) {
 		
 		synchronized (request.lock) {
+			
+			if (request.count == 0) {
+				return false;
+			}
 			
 			for (final NotifyingFuture<Result> future : request.remotes) {
 				future.setListener(null);
@@ -128,6 +134,8 @@ public final class Processor {
 			}
 			
 			request.remotes = null;
+			
+			return true;
 		}
 	}
 	
@@ -159,17 +167,18 @@ public final class Processor {
 
 	private void abortAll(boolean keep) {
 		
+		Set<WorkRequest> toAbort;
 		synchronized (workLock) {
-			
-			for (final WorkRequest request : working) {
-				abort(request);
-				
-				if (keep) {
-					requests.addFirst(request);
-				}
-			}
-			
+			toAbort = new HashSet<>(working);
 			working.clear();
+		}
+		
+		for (final WorkRequest request : toAbort) {
+			abort(request);
+			
+			if (keep) {
+				requests.addFirst(request);
+			}
 		}
 
 	}
@@ -218,6 +227,10 @@ public final class Processor {
 
 		private void gotResult() {
 
+			synchronized (workLock) {
+				working.remove(request);
+			}
+			
 			logger.debug("Joining results");
 			Result result = new Result(request.reference);
 			for (final Future<Result> remote : request.remotes) {
@@ -237,7 +250,12 @@ public final class Processor {
 				}
 			}
 			
-			request.future.setResponse(result);
+			
+			try {
+				request.future.setResponse(result);
+			} catch (final IllegalStateException e) {
+				// We're not bothered by this
+			}
 		}
 
 	}
@@ -254,9 +272,6 @@ public final class Processor {
 		
 		List<NotifyingFuture<Result>> remotes;
 
-		/**
-		 * {@inheritDoc}
-		 */
 		@Override
 		public String toString() {
 
@@ -277,8 +292,7 @@ public final class Processor {
 
 		@Override
 		protected boolean doCancel() {
-			abort(request);
-			return true;
+			return abort(request);
 		}
 		
 	}
