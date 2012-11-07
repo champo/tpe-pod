@@ -49,20 +49,24 @@ public class SignalStore {
 		
 		writeLock.lock();
 		
-		backups.add(data.getSignal());
-		addKnown(data);
-		
-		writeLock.unlock();
+		try {
+			backups.add(data.getSignal());
+			addKnown(data);
+		} finally {
+			writeLock.unlock();
+		}
 	}
 
 	public void addPrimary(SignalData data) {
 		
 		writeLock.lock();
 		
-		primaries.add(data.getSignal());
-		addKnown(data);
-		
-		writeLock.unlock();
+		try {
+			primaries.add(data.getSignal());
+			addKnown(data);
+		} finally {
+			writeLock.unlock();
+		}
 	}
 	
 	@GuardedBy("writeLock")
@@ -77,85 +81,109 @@ public class SignalStore {
 		
 		writeLock.lock();
 		
-		primaries.clear();
-		backups.clear();
-		knownSignals.clear();
-		
-		writeLock.unlock();
+		try {
+			primaries.clear();
+			backups.clear();
+			knownSignals.clear();
+		} finally {
+			writeLock.unlock();
+		}
 	}
 
 	public long getPrimaryCount() {
 		
 		readLock.lock();
-		final int size = primaries.size();
-		readLock.unlock();
-		
-		return size;
+		try {
+			return primaries.size();
+		} finally {
+			readLock.unlock();
+		}
 	}
 
 	public boolean add(Signal signal) {
 		
 		writeLock.lock();
-		final boolean added = primaries.add(signal);
-		writeLock.unlock();
 		
-		return added;
+		try {
+			return primaries.add(signal);
+		} finally {
+			writeLock.unlock();
+		}
 	}
 
 	public Set<Signal> getPrimaries() {
 		
 		writeLock.lock();
-		final Set<Signal> signals = new HashSet<>(primaries);
-		writeLock.unlock();
 		
-		return signals;
+		try {
+			return new HashSet<>(primaries);
+		} finally {
+			writeLock.unlock();
+		}
+		
 	}
 	
 	public long getBackupCount() {
 		
 		readLock.lock();
-		final int size = backups.size();
-		readLock.unlock();
 		
-		return size;
+		try {
+			return backups.size();
+		} finally {
+			readLock.unlock();
+		}
 	}
 
 	public void updateKnownSignal(Address original, Signal signal, Address destination) {
 		
 		writeLock.lock();
 		
-		knownSignals.remove(original, signal);
-		knownSignals.put(destination, signal);
-		
-		writeLock.unlock();
+		try {
+			knownSignals.remove(original, signal);
+			knownSignals.put(destination, signal);
+		} finally {
+			writeLock.unlock();
+		}
 		
 	}
 
 	public KnownNodeSignals getKnownSignalsFor(Address node, Address me) {
 		
 		writeLock.lock();
-		final Collection<Signal> signals = knownSignals.removeAll(node);
-		writeLock.unlock();
+		
+		final Collection<Signal> signals;
+		try {
+			signals = knownSignals.removeAll(node);
+		} finally {
+			writeLock.unlock();
+		}
 
 		final Set<SignalData> amPrimary = new HashSet<>();
 		final Set<SignalData> amBackup = new HashSet<>();
 		
 		readLock.lock();
 		
-		for (final Signal signal : signals) {
-			
-			final SignalData data = new SignalData(signal, me);
-			if (primaries.contains(signal)) {
-				amPrimary.add(data);
-			} else {
-				amBackup.add(data);
+		try {
+			for (final Signal signal : signals) {
+				
+				final SignalData data = new SignalData(signal, me);
+				if (primaries.contains(signal)) {
+					amPrimary.add(data);
+				} else {
+					amBackup.add(data);
+				}
+				
 			}
-			
+		} finally {
+			readLock.unlock();
 		}
 		
-		readLock.unlock();
-		
 		return new KnownNodeSignals(amBackup, amPrimary);
+	}
+
+	
+	public Set<SignalData> getRandomPrimaries(long count) {
+		return null;
 	}
 
 	
