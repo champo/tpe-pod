@@ -14,9 +14,9 @@ Short term todo list
 
 Reglas para modo degradado:
 
- - Suicidar y re encolar pedidos de procesamiento en curso
+ - Suicidar y re encolar pedidos de procesamiento en curso -- Done!
    - Incluye matar pedidos remotos
- - bloquear nuevos pedidos
+ - bloquear nuevos pedidos -- Done!
 
 Cambio de topologia:
 
