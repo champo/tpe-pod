@@ -5,11 +5,10 @@ package ar.edu.itba.pod.legajo50453.worker;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import org.jgroups.Address;
@@ -34,22 +33,29 @@ import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
 public final class Processor {
 
 	final static Logger logger = LoggerFactory.getLogger(Processor.class);
+	
+	private final Object workLock = new Object();
 
 	private final MessageDispatcher dispatcher;
 	
 	private final LinkedBlockingDeque<WorkRequest> requests;
 	
-	private final BlockingQueue<WorkRequest> working;
+	private final List<WorkRequest> working;
 
 	private final Channel channel;
 	
 	private Thread runner;
 
+	private final Semaphore permit;
+	
+	private boolean paused;
+
 	public Processor(Channel channel, MessageDispatcher dispatcher) {
 		this.dispatcher = dispatcher;
 		this.requests = new LinkedBlockingDeque<>();
-		this.working = new LinkedBlockingQueue<>();
+		this.working = new ArrayList<>();
 		this.channel = channel;
+		this.permit = new Semaphore(0);
 	}
 
 	public void start() {
@@ -58,6 +64,13 @@ public final class Processor {
 			runner = new Thread(new RequestConsumer());
 			runner.start();
 		}
+		
+		paused = false;
+		permit.release();
+	}
+	
+	public boolean isRunning() {
+		return runner != null;
 	}
 	
 	public Future<Result> process(Signal reference) {
@@ -76,7 +89,16 @@ public final class Processor {
 		
 		synchronized (request.lock) {
 			logger.info("Processing work request", request);
-			working.add(request);
+			
+			synchronized (workLock) {
+				
+				if (paused) {
+					requests.addFirst(request);
+					return;
+				}
+				
+				working.add(request);
+			}
 			
 			final View currentView = channel.getView();
 			final ResultListener listener = new ResultListener(request);
@@ -90,13 +112,13 @@ public final class Processor {
 				future.setListener(listener);
 				request.remotes.add(future);
 			}
+			
 			logger.debug("Requested all the remote orders");
 		}
 		
 	}
 	
 	private static void abort(WorkRequest request) {
-		
 		
 		synchronized (request.lock) {
 			
@@ -106,6 +128,16 @@ public final class Processor {
 			}
 			
 			request.remotes = null;
+		}
+	}
+	
+	public void pause() {
+		
+		if (runner != null) {
+			paused = true;
+			permit.drainPermits();
+			
+			abortAll(true);
 		}
 	}
 	
@@ -119,14 +151,27 @@ public final class Processor {
 				runner.join();
 			} catch (final InterruptedException e) {
 			} finally {
-				for (final WorkRequest request : working) {
-					abort(request);
-				}
-			
-				working.clear();
+				abortAll(false);
 				runner = null;
 			}
 		}
+	}
+
+	private void abortAll(boolean keep) {
+		
+		synchronized (workLock) {
+			
+			for (final WorkRequest request : working) {
+				abort(request);
+				
+				if (keep) {
+					requests.addFirst(request);
+				}
+			}
+			
+			working.clear();
+		}
+
 	}
 
 	private final class RequestConsumer implements Runnable {
@@ -135,11 +180,14 @@ public final class Processor {
 		public void run() {
 				
 			try {
+				
 				while (true) {
+					permit.acquire();
 					final WorkRequest request = requests.poll(1, TimeUnit.SECONDS);
 					if (request != null) {
 						work(request);
 					}
+					permit.release();
 				}
 				
 			} catch (final InterruptedException e) {

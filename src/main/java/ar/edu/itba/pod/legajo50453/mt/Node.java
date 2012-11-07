@@ -66,6 +66,8 @@ public class Node implements SignalProcessor, SPNode {
 
 	private final WorkerPool workerPool;
 
+	private boolean degraded;
+	
 	public Node(int threads) throws Exception {
 
 		channel = new JChannel("jgroups.xml");
@@ -81,14 +83,12 @@ public class Node implements SignalProcessor, SPNode {
 		consumer = new MessageConsumer(inboundMessages, store, dispatcher, workerPool);
 		consumerThread = new Thread(consumer);
 		consumerThread.start();
-		
 	}
 
 	@Override
 	public void join(String clusterName) throws RemoteException {
 		logger.info("Joining cluster " + clusterName);
 		
-		processor.start();
 		try {
 			channel.connect(clusterName);
 		} catch (final Exception e) {
@@ -101,6 +101,8 @@ public class Node implements SignalProcessor, SPNode {
 		logger.info("Leaving cluster");
 		
 		processor.stop();
+		workerPool.reset();
+		
 		store.empty();
 		recieved.set(0);
 			
@@ -110,19 +112,7 @@ public class Node implements SignalProcessor, SPNode {
 
 	@Override
 	public NodeStats getStats() throws RemoteException {
-		
-		boolean degraded = true;
-			
-		final View view = currentView;
-		if (view != null) {
-
-			final int nodes = view.size();
-
-			if (nodes > 1 && nodes == stableNodes) {
-				degraded = false;
-			}
-		}
-		
+	
 		final NodeStats stats = new NodeStats(channel.getName(), recieved.get(), store.getPrimaryCount(), store.getBackupCount(), degraded);
 		logger.debug("getStats(): ", new NodeStatsPrinter(stats));
 		return stats;
@@ -180,7 +170,7 @@ public class Node implements SignalProcessor, SPNode {
 		
 		try {
 			logger.debug("Processing signal", signal);
-			if (channel.isConnected()) {
+			if (processor.isRunning()) {
 				return processor.process(signal).get();
 			} else {
 				return workerPool.process(signal);
@@ -192,7 +182,19 @@ public class Node implements SignalProcessor, SPNode {
 		}
 	}
 
+	private void degrade() {
+		degraded = true;
+		
+		processor.pause();
+		workerPool.reset();
+	}
 	
+	private void normalityRestored() {
+		degraded = false;
+		
+		processor.start();
+	}
+		
 	private final class MessageReciever extends ReceiverAdapter {
 		
 		@Override
@@ -207,6 +209,11 @@ public class Node implements SignalProcessor, SPNode {
 			
 			if (currentView == null) {
 				currentView = view;
+
+				if (view.size() > 1) {
+					normalityRestored();
+				}
+				
 				return;
 			}
 			

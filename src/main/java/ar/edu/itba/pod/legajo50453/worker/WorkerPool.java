@@ -29,51 +29,9 @@ public final class WorkerPool {
 	final static Logger logger = LoggerFactory.getLogger(WorkerPool.class);
 	
 	public static interface Ready {
-
 		public void result(Result result);
 	}
 
-	private static final class WorkRequest {
-
-		public WorkRequest(Signal signal, Ready ready) {
-			this.signal = signal;
-			this.callback = ready;
-		}
-
-		Signal signal;
-		
-		Ready callback;
-		
-	}
-
-	/**
-	 * @author champo
-	 *
-	 */
-	private final class QueueConsumer implements Runnable {
-		
-		@Override
-		public void run() {
-			
-			try {
-				WorkRequest item;
-				while ((item = queue.take()) != null) {
-					final Result result = process(item.signal);
-					
-					try { 
-						item.callback.result(result);
-					} catch (final RuntimeException e) {
-						logger.error("Got exception on callback", e);
-					}
-				}
-				
-			} catch (final InterruptedException e) {
-				logger.debug("Interrupted queue consumer", e);
-			}
-			
-		}
-	}
-	
 	private final SignalStore store;
 	
 	private final ExecutorService pool;
@@ -88,7 +46,6 @@ public final class WorkerPool {
 		
 		queue = new LinkedBlockingDeque<>();
 		thread = new Thread(new QueueConsumer());
-		
 		thread.start();
 	}
 	
@@ -115,10 +72,50 @@ public final class WorkerPool {
 		return result;
 	}
 	
-	
-	
 	public void request(Signal signal, Ready ready) {
 		queue.add(new WorkRequest(signal, ready));
+	}
+
+
+	public void reset() {
+		queue.clear();
+	}
+	
+	private static final class WorkRequest {
+
+		Signal signal;
+		
+		Ready callback;
+		
+		public WorkRequest(Signal signal, Ready ready) {
+			this.signal = signal;
+			this.callback = ready;
+		}
+		
+	}
+
+	private final class QueueConsumer implements Runnable {
+		
+		@Override
+		public void run() {
+			
+			try {
+				WorkRequest item;
+				while ((item = queue.take()) != null) {
+					final Result result = process(item.signal);
+					
+					try { 
+						item.callback.result(result);
+					} catch (final RuntimeException e) {
+						logger.error("Got exception on callback", e);
+					}
+				}
+				
+			} catch (final InterruptedException e) {
+				logger.debug("Interrupted queue consumer", e);
+			}
+			
+		}
 	}
 
 }
