@@ -42,8 +42,6 @@ public class Node implements SignalProcessor, SPNode {
 	
 	final static Logger logger = LoggerFactory.getLogger(Node.class);
 
-	private final Object channelLock = new Object();
-
 	private final MessageConsumer consumer;
 	
 	private final AtomicInteger recieved = new AtomicInteger();
@@ -93,13 +91,11 @@ public class Node implements SignalProcessor, SPNode {
 		logger.info("Joining cluster " + clusterName);
 		suicide = false;
 		
-		synchronized (channelLock) {
-			try {
-				processor.start();
-				channel.connect(clusterName);
-			} catch (final Exception e) {
-				logger.error("Failed to connect to cluster", e);
-			}
+		processor.start();
+		try {
+			channel.connect(clusterName);
+		} catch (final Exception e) {
+			logger.error("Failed to connect to cluster", e);
 		}
 	}
 
@@ -113,25 +109,22 @@ public class Node implements SignalProcessor, SPNode {
 		store.empty();
 		recieved.set(0);
 			
-		synchronized (channelLock) {
-			currentView = null;
-			channel.disconnect();
-		}
+		currentView = null;
+		channel.disconnect();
 	}
 
 	@Override
 	public NodeStats getStats() throws RemoteException {
 		
 		boolean degraded = true;
-		synchronized (channelLock) {
 			
-			if (channel.isConnected()) {
-				
-				final int nodes = channel.getView().size();
-				
-				if (nodes > 1 && nodes == stableNodes) {
-					degraded = false;
-				}
+		final View view = currentView;
+		if (view != null) {
+
+			final int nodes = view.size();
+
+			if (nodes > 1 && nodes == stableNodes) {
+				degraded = false;
 			}
 		}
 		
@@ -147,12 +140,10 @@ public class Node implements SignalProcessor, SPNode {
 		//TODO: Randomize the primary add
 		if (store.add(signal)) {
 
-			synchronized (channelLock) {
-				
-				if (currentView != null && currentView.size() > 1) {
-					// The signal is new enough, let's back it up
-					sendBackup(signal);
-				}
+			final View view = currentView;
+			if (view != null && view.size() > 1) {
+				// The signal is new enough, let's back it up
+				sendBackup(signal);
 			}
 		}
 			
@@ -162,9 +153,9 @@ public class Node implements SignalProcessor, SPNode {
 
 		boolean success = false;
 		
-		while (!success) {
+		while (!success && channel.isConnected()) {
 			
-			final View view = channel.getView();
+			final View view = currentView;
 			final Address address = view.getMembers().get(rnd.nextInt(view.size()));
 			
 			if (address.equals(channel.getAddress())) {
