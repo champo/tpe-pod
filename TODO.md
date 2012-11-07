@@ -16,14 +16,15 @@ Reglas para modo degradado:
 
  - Suicidar y re encolar pedidos de procesamiento en curso
    - Incluye matar pedidos remotos
- - bloquear nuevos pedidos hasta volver a modo normal
+ - bloquear nuevos pedidos
 
 Agregado de nodos:
 
- - entrar en modo degradado (asesinar todo? -- future optimization)
+ - entrar en modo degradado
  - elegir n/(k-1) primarias y backups, pasarlo al nuevo nodo
  - broadcast de stable una vez que pase todo y recibi acks
  - retorno a modo normal cuando recibi todos los broadcasts (usar FLUSH para asegurar que todos sepan bien que estan modo normal)
+ - a la hora de agregar un primario/backup tengo que mirar si esta en la otra lista, y redirigirla si es asi
 
 Cosas random
 
