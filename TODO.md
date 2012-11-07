@@ -18,13 +18,16 @@ Reglas para modo degradado:
    - Incluye matar pedidos remotos
  - bloquear nuevos pedidos
 
-Agregado de nodos:
+Cambio de topologia:
 
  - entrar en modo degradado
- - elegir n/(k-1) primarias y backups, pasarlo al nuevo nodo
- - broadcast de stable una vez que pase todo y recibi acks
- - retorno a modo normal cuando recibi todos los broadcasts (usar FLUSH para asegurar que todos sepan bien que estan modo normal)
- - a la hora de agregar un primario/backup tengo que mirar si esta en la otra lista, y redirigirla si es asi
+ - 2 fases de pasaje -- primarios y backups
+   - elegir señales a pasar
+     - al azar si es un add
+     - las del nodo caido si es un drop
+   - enviar y actualizar data de quien tiene la otra copia (incluye mandar mensajes si es necesario)
+   - esperar a que me confirmen todos los sends
+ - esperar confirmacion de todos para volver a modo normal
 
 Cosas random
 
