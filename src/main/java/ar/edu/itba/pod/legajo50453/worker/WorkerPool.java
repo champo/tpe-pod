@@ -63,13 +63,12 @@ public final class WorkerPool {
 					try { 
 						item.callback.result(result);
 					} catch (final RuntimeException e) {
-						System.out.println("Got exception on callback:\n" + e);
+						logger.error("Got exception on callback", e);
 					}
 				}
 				
 			} catch (final InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				logger.debug("Interrupted queue consumer", e);
 			}
 			
 		}
@@ -115,6 +114,8 @@ public final class WorkerPool {
 		
 		return result;
 	}
+	
+	
 	
 	public void request(Signal signal, Ready ready) {
 		queue.add(new WorkRequest(signal, ready));
