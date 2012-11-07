@@ -55,8 +55,6 @@ public class Node implements SignalProcessor, SPNode {
 	
 	private final Random rnd = new Random();
 	
-	private int stableNodes;
-
 	private final BlockingQueue<Message> inboundMessages;
 
 	private final Thread consumerThread;
@@ -146,13 +144,15 @@ public class Node implements SignalProcessor, SPNode {
 		while (!success && channel.isConnected()) {
 			
 			final View view = currentView;
+			final Address me = channel.getAddress();
+			
 			final Address address = view.getMembers().get(rnd.nextInt(view.size()));
 			
-			if (address.equals(channel.getAddress())) {
+			if (address.equals(me)) {
 				continue;
 			}
 			
-			final Future<Void> response = dispatcher.sendMessage(address, new SignalData(signal, channel.getAddress()));
+			final Future<Void> response = dispatcher.sendMessage(address, new SignalData(signal, me));
 			
 			try {
 				response.get();

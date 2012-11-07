@@ -18,6 +18,7 @@ import ar.edu.itba.pod.legajo50453.message.MessageDispatcher;
 import ar.edu.itba.pod.legajo50453.message.PhaseReady;
 import ar.edu.itba.pod.legajo50453.message.PrimarySignal;
 import ar.edu.itba.pod.legajo50453.message.SignalData;
+import ar.edu.itba.pod.legajo50453.message.SignalStored;
 import ar.edu.itba.pod.legajo50453.message.SimilarRequest;
 import ar.edu.itba.pod.legajo50453.worker.WorkerPool;
 
@@ -82,14 +83,11 @@ public class MessageConsumer implements Runnable {
 		final AnswerableMessage answerable = (AnswerableMessage) msg.getObject();
 		final Object object = answerable.getPayload();
 		if (object instanceof SignalData) {
-			store.addBackup((SignalData) object);
+			final SignalData data = (SignalData) object;
+			store.addBackup(data);
 			
-			try {
-				dispatcher.respondTo(msg.getSrc(), answerable.getId(), null);
-			} catch (final Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			notifyStore(msg, answerable, data);
+
 		} else if (object instanceof SimilarRequest) {
 			final SimilarRequest request = (SimilarRequest) object;
 			workerPool.request(request.getSignal(), new WorkerPool.Ready() {
@@ -109,23 +107,33 @@ public class MessageConsumer implements Runnable {
 			});
 		} else if (object instanceof PrimarySignal) {
 			final PrimarySignal signal = (PrimarySignal) object;
-			store.add(signal.getSignalData().getSignal());
+			final SignalData data = signal.getSignalData();
+			store.addPrimary(data);
 			
-			//TODO: ACtually send something useful
-			final NotifyingFuture<Void> future = dispatcher.sendMessage(signal.getSignalData().getOtherNode(), null);
-			future.setListener(new FutureListener<Void>() {
-				
-				@Override
-				public void futureDone(Future<Void> future) {
-					try {
-						dispatcher.respondTo(msg.getSrc(), answerable.getId(), null);
-					} catch (final Exception e) {
-						e.printStackTrace();
-					}
-				}
-			});
+			notifyStore(msg, answerable, data);
+		} else if (object instanceof SignalStored) {
+			final SignalStored stored = (SignalStored) object;
+			
+			store.updateKnownSignal(stored.getOriginal(), stored.getSignal(), msg.getSrc());
 		}
 		
+	}
+
+	private void notifyStore(final Message msg, final AnswerableMessage answerable, final SignalData data) {
+		
+		final SignalStored stored = new SignalStored(data.getSignal(), msg.getSrc());
+		final NotifyingFuture<Void> future = dispatcher.sendMessage(data.getOtherNode(), stored);
+		future.setListener(new FutureListener<Void>() {
+			
+			@Override
+			public void futureDone(Future<Void> future) {
+				try {
+					dispatcher.respondTo(msg.getSrc(), answerable.getId(), null);
+				} catch (final Exception e) {
+					e.printStackTrace();
+				}
+			}
+		});
 	}
 
 	public void waitForPhaseEnd(int size) throws Exception {

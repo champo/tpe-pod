@@ -26,5 +26,5 @@ public class SignalData implements Serializable {
 	public Address getOtherNode() {
 		return other;
 	}
-
+	
 }
