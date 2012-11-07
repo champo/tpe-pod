@@ -53,6 +53,7 @@ public class SignalStore {
 
 	public void empty() {
 		primaries.clear();
+		backups.clear();
 	}
 
 	public long getPrimaryCount() {
