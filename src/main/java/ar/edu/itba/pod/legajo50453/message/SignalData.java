@@ -6,25 +6,25 @@ import org.jgroups.Address;
 
 import ar.edu.itba.pod.api.Signal;
 
-public class BackupSignal implements Serializable {
+public class SignalData implements Serializable {
 
 	private static final long serialVersionUID = 6453745424128393102L;
 
 	private final Signal signal;
 	
-	private final Address primary;
+	private final Address other;
 
-	public BackupSignal(Signal signal, Address primary) {
+	public SignalData(Signal signal, Address other) {
 		this.signal = signal;
-		this.primary = primary;
+		this.other = other;
 	}
 	
 	public Signal getSignal() {
 		return signal;
 	}
 	
-	public Address getPrimary() {
-		return primary;
+	public Address getOtherNode() {
+		return other;
 	}
 
 }

@@ -81,6 +81,10 @@ public class MessageDispatcher {
 	public void respondTo(Address address, long id, Serializable payload) throws Exception {
 		channel.send(address, new AnswerMessage(id, payload));
 	}
+
+	public void broadcast(Serializable msg) throws Exception {
+		channel.send(null, msg);
+	}
 	
 	private <T> boolean cancelFuture(ResponseFuture<T> future) {
 		if (futures.remove(future.getId()) != null) {
@@ -90,7 +94,7 @@ public class MessageDispatcher {
 		
 		return false;
 	}
-
+	
 	public class ResponseFuture<T> extends FutureImpl<T> {
 		
 		private final long id;

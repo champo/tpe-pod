@@ -20,17 +20,29 @@ Reglas para modo degradado:
 
 Cambio de topologia:
 
- - entrar en modo degradado
- - 2 fases de pasaje -- primarios y backups
-   - elegir señales a pasar
-     - al azar si es un add
-     - las del nodo caido si es un drop
-   - enviar y actualizar data de quien tiene la otra copia (incluye mandar mensajes si es necesario)
-   - esperar a que me confirmen todos los sends
- - esperar confirmacion de todos para volver a modo normal
+ - entrar en modo degradado -- Done!
+ - 2 fases de pasaje -- primarios y backups -- Done!
+   - elegir señales a pasar -- Done!
+   - enviar señal -- Done!
+   - Guardar señales recibidas
+   - actualizar data de quien tiene la otra copia
+   - esperar a que me confirmen todos los sends -- Done!
+   - esperar a que todos los nodos terminen la fase -- Done!
+ - esperar confirmacion de todos para volver a modo normal -- Done!
+
+Add:
+
+ - hacer cambio de topologia -- Done!
+ - elegir señales al azar
+
+Remove:
+
+ - hacer cambio de topologia
+ - las del nodo caido si es un drop
 
 Cosas random
 
  - protocol FIFO pa orden de mensajes <= util para el add de una primary en otro nodo (bloque el add del otro lado, y no antiende el pedido de procesamiento hasta que ya esta agregada la señal)
  - mandarte mensaje de pedido de procesamiento a vos mismo -- Done!
  - simplemente dejar de responder cosas para el clean exit
+ - viewAccepted y join -- WTF un solo cambio o varios? <==== FATAL

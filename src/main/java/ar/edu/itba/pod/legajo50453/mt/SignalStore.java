@@ -6,7 +6,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 import ar.edu.itba.pod.api.Signal;
-import ar.edu.itba.pod.legajo50453.message.BackupSignal;
+import ar.edu.itba.pod.legajo50453.message.SignalData;
 
 public class SignalStore {
 
@@ -36,7 +36,7 @@ public class SignalStore {
 
 	private final ConcurrentSkipListSet<Signal> primaries;
 	
-	private final Set<BackupSignal> backups;
+	private final Set<SignalData> backups;
 	
 	public SignalStore() {
 		
@@ -45,7 +45,7 @@ public class SignalStore {
 		primaries = new ConcurrentSkipListSet<>(new SignalComparator());
 	}
 
-	public void addBackup(BackupSignal backup) {
+	public void addBackup(SignalData backup) {
 		synchronized (backups) {
 			backups.add(backup);
 		}
@@ -74,5 +74,5 @@ public class SignalStore {
 			return backups.size();
 		}
 	}
-	
+
 }

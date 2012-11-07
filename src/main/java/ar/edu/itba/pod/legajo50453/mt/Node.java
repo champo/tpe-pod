@@ -4,8 +4,11 @@
 package ar.edu.itba.pod.legajo50453.mt;
 
 import java.rmi.RemoteException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -18,6 +21,7 @@ import org.jgroups.JChannel;
 import org.jgroups.Message;
 import org.jgroups.ReceiverAdapter;
 import org.jgroups.View;
+import org.jgroups.util.NotifyingFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,8 +30,9 @@ import ar.edu.itba.pod.api.Result;
 import ar.edu.itba.pod.api.SPNode;
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.api.SignalProcessor;
-import ar.edu.itba.pod.legajo50453.message.BackupSignal;
 import ar.edu.itba.pod.legajo50453.message.MessageDispatcher;
+import ar.edu.itba.pod.legajo50453.message.PrimarySignal;
+import ar.edu.itba.pod.legajo50453.message.SignalData;
 import ar.edu.itba.pod.legajo50453.worker.Processor;
 import ar.edu.itba.pod.legajo50453.worker.WorkerPool;
 
@@ -147,7 +152,7 @@ public class Node implements SignalProcessor, SPNode {
 				continue;
 			}
 			
-			final Future<Void> response = dispatcher.sendMessage(address, new BackupSignal(signal, channel.getAddress()));
+			final Future<Void> response = dispatcher.sendMessage(address, new SignalData(signal, channel.getAddress()));
 			
 			try {
 				response.get();
@@ -183,6 +188,7 @@ public class Node implements SignalProcessor, SPNode {
 	}
 
 	private void degrade() {
+		logger.info("OH GOD OH GOD WERE ALL GONNA DIE");
 		degraded = true;
 		
 		processor.pause();
@@ -190,8 +196,9 @@ public class Node implements SignalProcessor, SPNode {
 	}
 	
 	private void normalityRestored() {
-		degraded = false;
+		logger.info("We now have normality, whatever that means");
 		
+		degraded = false;
 		processor.start();
 	}
 		
@@ -217,29 +224,100 @@ public class Node implements SignalProcessor, SPNode {
 				return;
 			}
 			
-			final SetView<Address> difference = Sets.symmetricDifference(new HashSet<>(currentView.getMembers()), new HashSet<>(view.getMembers()));
+			final Set<Address> currentSet = new HashSet<>(currentView.getMembers());
+			final Set<Address> newSet = new HashSet<>(view.getMembers());
 			
-			logger.info("View difference", difference);
-			currentView = view;
-			if (difference.size() > 1) {
-				// WERE ALL DOOMED
-				logger.error("Got more than one difference, humped");
-				throw new RuntimeException();
+			final SetView<Address> removed = Sets.difference(currentSet, newSet);
+				
+			if (removed.size() > 1) {
+				logger.info("I don't have to put up with this :D");
+				System.exit(1);
+			} else if (removed.size() == 1) {
+				final Address change = removed.iterator().next();
+				topologyChange(new NodeDisconnectSelector(store, change));
 			}
 			
-			if (difference.size() == 0) {
-				return;
-			}
+			//TODO: Handle joins
+		}
+	}
+
+	private void topologyChange(SignalSelector selector) {
+		
+		degrade();
+		
+		final View view = currentView;
+		
+		try {
+			distributePrimaries(selector, view);
+			distributeBackups(selector, view);
 			
-			final Address change = difference.iterator().next();
-			if (view.containsMember(change)) {
-				// TODO: Handle adding nodes
-				stableNodes = 0;
-			} else {
-				dispatcher.nodeDisconnected(change);
-				//TODO: Handle rebalacing
+			consumer.waitForPhaseEnd(view.size());
+		} catch (final Exception e) {
+			logger.error("Death during topology change", e);
+			System.exit(3);
+		}
+		
+		normalityRestored();
+	}
+
+	public void distributePrimaries(SignalSelector selector, final View view) throws Exception {
+
+		final Set<SignalData> primaries = selector.selectPrimaries();
+		
+		final List<NotifyingFuture<Void>> futures = new ArrayList<>();
+		for (final SignalData signalData : primaries) {
+			
+			while (true) {
+				final Address address = view.getMembers().get(rnd.nextInt(view.size()));
+				
+				if (address.equals(channel.getAddress())) {
+					continue;
+				}
+				
+				futures.add(dispatcher.<Void>sendMessage(address, new PrimarySignal(signalData)));
 			}
 		}
+		
+		for (final NotifyingFuture<Void> future : futures) {
+			try {
+				future.get();
+			} catch (InterruptedException | ExecutionException e) {
+				logger.error("A future failed during a topology change. We bail.", e);
+				System.exit(2);
+			}
+		}
+
+		consumer.waitForPhaseEnd(view.size());
+	}
+	
+	public void distributeBackups(SignalSelector selector, final View view) throws Exception {
+
+		final Set<SignalData> backups = selector.selectBackups();
+		
+		final List<NotifyingFuture<Void>> futures = new ArrayList<>();
+		for (final SignalData signalData : backups) {
+			
+			while (true) {
+				final Address address = view.getMembers().get(rnd.nextInt(view.size()));
+				
+				if (address.equals(channel.getAddress())) {
+					continue;
+				}
+				
+				futures.add(dispatcher.<Void>sendMessage(address, signalData));
+			}
+		}
+		
+		for (final NotifyingFuture<Void> future : futures) {
+			try {
+				future.get();
+			} catch (InterruptedException | ExecutionException e) {
+				logger.error("A future failed during a topology change. We bail.", e);
+				System.exit(2);
+			}
+		}
+		
+		consumer.waitForPhaseEnd(view.size());
 	}
 
 }
