@@ -32,12 +32,12 @@ Cambio de topologia:
 
 Add:
 
- - hacer cambio de topologia -- Done!
+ - disparar cambio de topologia
  - elegir señales al azar
 
 Remove:
 
- - hacer cambio de topologia
+ - disparar cambio de topologia -- Done!
  - las del nodo caido si es un drop
 
 Cosas random
