@@ -239,7 +239,10 @@ public class Node implements SignalProcessor, SPNode {
 				topologyChange(new NodeDisconnectSelector(store, change, channel.getAddress()));
 			}
 			
-			//TODO: Handle joins
+			final SetView<Address> added = Sets.difference(newSet, currentSet);
+			if (added.size() > 0) {
+				topologyChange(new NodeAddedSelector(store, currentSet.size()));
+			}
 		}
 	}
 
