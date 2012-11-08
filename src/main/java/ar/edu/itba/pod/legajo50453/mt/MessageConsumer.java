@@ -84,6 +84,7 @@ public class MessageConsumer implements Runnable {
 		final Object object = answerable.getPayload();
 		if (object instanceof SignalData) {
 			final SignalData data = (SignalData) object;
+			
 			store.addBackup(data);
 			
 			notifyStore(msg, answerable, data);
@@ -115,11 +116,17 @@ public class MessageConsumer implements Runnable {
 			final SignalStored stored = (SignalStored) object;
 			
 			store.updateKnownSignal(stored.getOriginal(), stored.getSignal(), msg.getSrc());
+			ack(msg, answerable);
 		}
 		
 	}
 
 	private void notifyStore(final Message msg, final AnswerableMessage answerable, final SignalData data) {
+		
+		if (data.getOtherNode() == null) {
+			ack(msg, answerable);
+			return;
+		}
 		
 		final SignalStored stored = new SignalStored(data.getSignal(), msg.getSrc());
 		final NotifyingFuture<Void> future = dispatcher.sendMessage(data.getOtherNode(), stored);
@@ -127,11 +134,7 @@ public class MessageConsumer implements Runnable {
 			
 			@Override
 			public void futureDone(Future<Void> future) {
-				try {
-					dispatcher.respondTo(msg.getSrc(), answerable.getId(), null);
-				} catch (final Exception e) {
-					e.printStackTrace();
-				}
+				ack(msg, answerable);
 			}
 		});
 	}
@@ -139,6 +142,14 @@ public class MessageConsumer implements Runnable {
 	public void waitForPhaseEnd(int size) throws Exception {
 		dispatcher.broadcast(new PhaseReady());
 		phaseCounter.acquire(size);
+	}
+
+	private void ack(final Message msg, final AnswerableMessage answerable) {
+		try {
+			dispatcher.respondTo(msg.getSrc(), answerable.getId(), null);
+		} catch (final Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 }
