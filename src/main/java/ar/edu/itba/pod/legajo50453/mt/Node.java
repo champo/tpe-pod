@@ -152,6 +152,7 @@ public class Node implements SignalProcessor, SPNode {
 				continue;
 			}
 			
+			logger.debug("Sending signal to {}", address);
 			final Future<Void> response = dispatcher.sendMessage(address, new SignalData(signal, me));
 			
 			try {
@@ -240,7 +241,7 @@ public class Node implements SignalProcessor, SPNode {
 			}
 			
 			final SetView<Address> added = Sets.difference(newSet, currentSet);
-			if (added.size() > 0) {
+			if (false && added.size() > 0) {
 				topologyChange(new NodeAddedSelector(store, currentSet.size()));
 			}
 		}
@@ -262,12 +263,15 @@ public class Node implements SignalProcessor, SPNode {
 			System.exit(3);
 		}
 		
+		store.logDebug();
+		
 		normalityRestored();
 	}
 
 	public void distributePrimaries(SignalSelector selector, final View view) throws Exception {
 
 		final Set<SignalData> primaries = selector.selectPrimaries();
+		logger.info("About to distribute primaries:\n {}", primaries);
 		
 		final List<NotifyingFuture<Void>> futures = new ArrayList<>();
 		for (final SignalData signalData : primaries) {
@@ -280,9 +284,11 @@ public class Node implements SignalProcessor, SPNode {
 				}
 				
 				futures.add(dispatcher.<Void>sendMessage(address, new PrimarySignal(signalData)));
+				break;
 			}
 		}
 		
+		logger.debug("Waiting for futures...");
 		for (final NotifyingFuture<Void> future : futures) {
 			try {
 				future.get();
@@ -310,6 +316,7 @@ public class Node implements SignalProcessor, SPNode {
 				}
 				
 				futures.add(dispatcher.<Void>sendMessage(address, signalData));
+				break;
 			}
 		}
 		

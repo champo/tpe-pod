@@ -10,6 +10,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import net.jcip.annotations.GuardedBy;
 
 import org.jgroups.Address;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ar.edu.itba.pod.api.Signal;
 import ar.edu.itba.pod.legajo50453.message.SignalData;
@@ -19,6 +21,8 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 
 public class SignalStore {
+	
+	final static Logger logger = LoggerFactory.getLogger(MessageConsumer.class);
 
 	@GuardedBy("lock")
 	private final Set<Signal> primaries;
@@ -184,6 +188,18 @@ public class SignalStore {
 	
 	public Set<SignalData> getRandomPrimaries(long count) {
 		return null;
+	}
+
+	public void logDebug() {
+		
+		readLock.lock();
+		try {
+			logger.debug("Primaries {}", primaries);
+			logger.debug("Backups {}", backups);
+			logger.debug("Known {}", knownSignals);
+		} finally {
+			readLock.unlock();
+		}
 	}
 
 	

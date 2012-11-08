@@ -53,21 +53,19 @@ public class MessageConsumer implements Runnable {
 				final Message msg = queue.poll(1, TimeUnit.SECONDS);
 				if (msg != null) {
 
-					logger.debug("Inbound message", msg);
-					
 					try {
 						final Object object = msg.getObject();
 						if (object instanceof AnswerableMessage) {
 							handleMessage(msg);
 						} else if (object instanceof AnswerMessage) {
-							logger.debug("Giving answer to dispatcher", object);
 							dispatcher.processResponse(msg.getSrc(), (AnswerMessage) object);
 						} else if (object instanceof PhaseReady) {
+							logger.debug("Got phase counter, increasing from {} by one", phaseCounter.availablePermits());
 							phaseCounter.release();
 						}
 						
 					} catch (final RuntimeException e) {
-						System.out.println("Caught exception while handling message:\n" + e);
+						logger.error("Caught exception while handling message:", e);
 					}
 				}
 			}
@@ -85,6 +83,7 @@ public class MessageConsumer implements Runnable {
 		if (object instanceof SignalData) {
 			final SignalData data = (SignalData) object;
 			
+			logger.debug("Storing backup I got from {}", msg.getSrc());
 			store.addBackup(data);
 			
 			notifyStore(msg, answerable, data);
@@ -97,11 +96,10 @@ public class MessageConsumer implements Runnable {
 				public void result(Result result) {
 				
 					try {
-						logger.debug("Returning process request", result);
+						logger.debug("Returning process request {}", result);
 						dispatcher.respondTo(msg.getSrc(), answerable.getId(), result);
 					} catch (final Exception e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+						logger.error("Failed to send process request result", e);
 					}
 					
 				}
@@ -109,12 +107,15 @@ public class MessageConsumer implements Runnable {
 		} else if (object instanceof PrimarySignal) {
 			final PrimarySignal signal = (PrimarySignal) object;
 			final SignalData data = signal.getSignalData();
+			
+			logger.debug("Storing primary gotten from {}", msg.getSrc());
 			store.addPrimary(data);
 			
 			notifyStore(msg, answerable, data);
 		} else if (object instanceof SignalStored) {
 			final SignalStored stored = (SignalStored) object;
 			
+			logger.debug("Updating known signal position (src {})", msg.getSrc());
 			store.updateKnownSignal(stored.getOriginal(), stored.getSignal(), msg.getSrc());
 			ack(msg, answerable);
 		}
@@ -124,10 +125,12 @@ public class MessageConsumer implements Runnable {
 	private void notifyStore(final Message msg, final AnswerableMessage answerable, final SignalData data) {
 		
 		if (data.getOtherNode() == null) {
+			logger.debug("No other node, skiping notification");
 			ack(msg, answerable);
 			return;
 		}
 		
+		logger.debug("Notifying {} of signal stored", data.getOtherNode());
 		final SignalStored stored = new SignalStored(data.getSignal(), msg.getSrc());
 		final NotifyingFuture<Void> future = dispatcher.sendMessage(data.getOtherNode(), stored);
 		future.setListener(new FutureListener<Void>() {
@@ -139,16 +142,17 @@ public class MessageConsumer implements Runnable {
 		});
 	}
 
-	public void waitForPhaseEnd(int size) throws Exception {
+	public void waitForPhaseEnd(int viewSize) throws Exception {
+		logger.debug("Waiting for phase end... (view size {}, have {})", viewSize, phaseCounter.availablePermits());
 		dispatcher.broadcast(new PhaseReady());
-		phaseCounter.acquire(size);
+		phaseCounter.acquire(viewSize - 1);
 	}
 
 	private void ack(final Message msg, final AnswerableMessage answerable) {
 		try {
 			dispatcher.respondTo(msg.getSrc(), answerable.getId(), null);
 		} catch (final Exception e) {
-			e.printStackTrace();
+			logger.error("Failed to ACK to message", e);
 		}
 	}
 

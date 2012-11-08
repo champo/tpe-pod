@@ -26,5 +26,10 @@ public class SignalData implements Serializable {
 	public Address getOtherNode() {
 		return other;
 	}
+
+	@Override
+	public String toString() {
+		return "SignalData [signal=" + signal + ", other=" + other + "]";
+	}
 	
 }
