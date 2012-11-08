@@ -1,7 +1,11 @@
 package ar.edu.itba.pod.legajo50453.mt;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -18,11 +22,14 @@ import ar.edu.itba.pod.legajo50453.message.SignalData;
 import ar.edu.itba.pod.legajo50453.mt.NodeDisconnectSelector.KnownNodeSignals;
 
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
+import com.google.common.collect.Sets.SetView;
 
 public class SignalStore {
 	
 	final static Logger logger = LoggerFactory.getLogger(MessageConsumer.class);
+	
+	final static Random rnd = new Random();
 
 	@GuardedBy("lock")
 	private final Set<Signal> primaries;
@@ -31,8 +38,8 @@ public class SignalStore {
 	private final Set<Signal> backups;
 	
 	@GuardedBy("lock")
-	private final Multimap<Address, Signal> knownSignals;
-
+	private final ArrayListMultimap<Address, Signal> knownSignals;
+	
 	private final ReentrantReadWriteLock lock;
 
 	private final ReadLock readLock;
@@ -186,17 +193,127 @@ public class SignalStore {
 	}
 
 	
-	public Set<SignalData> getRandomPrimaries(long count) {
-		return null;
+	public Set<SignalData> getRandomPrimaries(long count, Address me) {
+		
+		writeLock.lock();
+		
+		try {
+			final Set<SignalData> result = new HashSet<>();
+			final List<Address> keys = new ArrayList<>(knownSignals.keySet());
+			
+			if (keys.size() == 0) {
+				
+				final Iterator<Signal> iterator = primaries.iterator();
+				for (int i = 0; i < count; i++) {
+					final Signal signal = iterator.next();
+					
+					result.add(new SignalData(signal, me));
+					backups.add(signal);
+				}
+				
+			} else {
+			
+				for (int i = 0; i < count;) {
+					
+					final Address address = keys.get(rnd.nextInt(keys.size()));
+					final List<Signal> signals = knownSignals.get(address);
+					
+					final int size = signals.size();
+					if (size > 0) {
+						final int index = rnd.nextInt(size);
+						final Signal signal = signals.get(index);
+						
+						if (primaries.contains(signal)) {
+							result.add(new SignalData(signal, address));
+							
+							signals.remove(index);
+							primaries.remove(signal);
+							
+							i++;
+						}
+					}
+				}
+			}
+			
+			return result;
+		} finally {
+			writeLock.unlock();
+		}
+	}
+	
+	public Set<SignalData> getRandomBackups(long count, Address me) {
+		
+		writeLock.lock();
+		
+		try {
+			final Set<SignalData> result = new HashSet<>();
+			final List<Address> keys = new ArrayList<>(knownSignals.keySet());
+			
+			if (keys.size() == 0) {
+				
+				final Iterator<Signal> iterator = primaries.iterator();
+				for (int i = 0; i < count; i++) {
+					result.add(new SignalData(iterator.next(), me));
+				}
+				
+			} else {
+				
+				for (int i = 0; i < count;) {
+					
+					final Address address = keys.get(rnd.nextInt(keys.size()));
+					final List<Signal> signals = knownSignals.get(address);
+					
+					final int size = signals.size();
+					if (size > 0) {
+						final int index = rnd.nextInt(size);
+						final Signal signal = signals.get(index);
+						
+						if (backups.contains(signal)) {
+							result.add(new SignalData(signal, address));
+							
+							signals.remove(index);
+							backups.remove(signal);
+							
+							i++;
+						}
+					}
+				}
+			}
+			
+			return result;
+			
+		} finally {
+			writeLock.unlock();
+		}
 	}
 
 	public void logDebug() {
 		
 		readLock.lock();
 		try {
-			logger.debug("Primaries {}", primaries);
-			logger.debug("Backups {}", backups);
-			logger.debug("Known {}", knownSignals);
+			
+			final SetView<Signal> intersection = Sets.intersection(primaries, backups);
+			if (intersection.size() > 0) {
+				logger.error("Have a non-empty intersection between primaries and backups... {}", intersection);
+			}
+			
+			final Set<Signal> allKnown = new HashSet<>(knownSignals.values());
+
+			final SetView<Signal> first = Sets.difference(primaries, allKnown);
+			if (first.size() > 0) {
+				logger.error("I have primaries I dont know where the backup is: {}", first);
+			}
+			
+			final SetView<Signal> second = Sets.difference(backups, allKnown);
+			if (second.size() > 0) {
+				logger.error("I have backups I dont know where the primary is: {}", second);
+			}
+			
+			final SetView<Signal> shouldBeEmpty = Sets.symmetricDifference(allKnown, Sets.union(primaries, backups));
+			if (shouldBeEmpty.size() != 0) {
+				logger.error("I know about signals I shouldnt know about: {}", shouldBeEmpty);
+			}
+			
 		} finally {
 			readLock.unlock();
 		}

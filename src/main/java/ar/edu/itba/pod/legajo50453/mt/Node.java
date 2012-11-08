@@ -241,8 +241,8 @@ public class Node implements SignalProcessor, SPNode {
 			}
 			
 			final SetView<Address> added = Sets.difference(newSet, currentSet);
-			if (false && added.size() > 0) {
-				topologyChange(new NodeAddedSelector(store, currentSet.size()));
+			if (added.size() > 0) {
+				topologyChange(new NodeAddedSelector(channel.getAddress(), store, currentSet.size()));
 			}
 		}
 	}

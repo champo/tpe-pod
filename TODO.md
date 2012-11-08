@@ -33,7 +33,7 @@ Cambio de topologia:
 Add:
 
  - disparar cambio de topologia -- Done!
- - elegir señales al azar
+ - elegir señales al azar -- Done!
 
 Remove:
 
