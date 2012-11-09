@@ -112,12 +112,14 @@ public class Node implements SignalProcessor, SPNode {
 		
 		store.empty();
 		recieved.set(0);
-			
-		currentView = null;
-		channel.disconnect();
 		
-		consumerThread.interrupt();
-		consumerThread = null;
+		if (channel.isConnected()) {
+			currentView = null;
+			channel.disconnect();
+			
+			consumerThread.interrupt();
+			consumerThread = null;
+		}
 		
 		degraded = true;
 	}
