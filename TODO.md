@@ -11,7 +11,7 @@ Short term todo list
  - futureimpl is not thread safe -- Done!
  - bancarse procesamiento en sigle node mode -- Done!
  - stop de processor -- Done!
- - Abstraer la logica de seleccion de nodo a quien mandar en cambios de topologia (Se manda cagadas en el remove)
+ - Abstraer la logica de seleccion de nodo a quien mandar en cambios de topologia (Se manda cagadas en el remove) -- Done!
  - clean exit
    - dejar de responder a pedidos externos
    - estado de "no acepto pedidos" en Processor

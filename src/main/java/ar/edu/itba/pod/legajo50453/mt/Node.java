@@ -275,19 +275,19 @@ public class Node implements SignalProcessor, SPNode {
 					System.exit(1);
 				} else if (removed.size() == 1) {
 					final Address change = removed.iterator().next();
-					topologyChange(new NodeDisconnectSelector(store, change, channel.getAddress()));
+					topologyChange(new NodeDisconnectSelector(view, store, change, channel.getAddress()));
 				}
 				
 				final SetView<Address> added = Sets.difference(newSet, currentSet);
 				if (added.size() > 0) {
 					final Address newGuy = added.iterator().next();
-					topologyChange(new NodeAddedSelector(channel.getAddress(), newGuy, store, view.size()));
+					topologyChange(new NodeAddedSelector(channel.getAddress(), newGuy, view, store));
 				}
 			}
 		}).start();
 	}
 
-	private void topologyChange(SignalSelector selector) {
+	private void topologyChange(DistributionSelector selector) {
 		
 		degrade();
 		
@@ -308,24 +308,14 @@ public class Node implements SignalProcessor, SPNode {
 		normalityRestored();
 	}
 
-	public void distributePrimaries(SignalSelector selector, final View view) throws Exception {
+	public void distributePrimaries(DistributionSelector selector, final View view) throws Exception {
 
 		final Set<SignalData> primaries = selector.selectPrimaries();
 		logger.info("About to distribute primaries:\n {}", primaries);
 		
 		final List<NotifyingFuture<Void>> futures = new ArrayList<>();
 		for (final SignalData signalData : primaries) {
-			
-			while (true) {
-				final Address address = view.getMembers().get(rnd.nextInt(view.size()));
-				
-				if (address.equals(channel.getAddress())) {
-					continue;
-				}
-				
-				futures.add(dispatcher.<Void>sendMessage(address, new PrimarySignal(signalData)));
-				break;
-			}
+			futures.add(dispatcher.<Void>sendMessage(selector.getDestinationAddress(), new PrimarySignal(signalData)));
 		}
 		
 		logger.debug("Waiting for futures...");
@@ -341,23 +331,13 @@ public class Node implements SignalProcessor, SPNode {
 		consumer.waitForPhaseEnd(view.size());
 	}
 	
-	public void distributeBackups(SignalSelector selector, final View view) throws Exception {
+	public void distributeBackups(DistributionSelector selector, final View view) throws Exception {
 
 		final Set<SignalData> backups = selector.selectBackups();
 		
 		final List<NotifyingFuture<Void>> futures = new ArrayList<>();
 		for (final SignalData signalData : backups) {
-			
-			while (true) {
-				final Address address = view.getMembers().get(rnd.nextInt(view.size()));
-				
-				if (address.equals(channel.getAddress())) {
-					continue;
-				}
-				
-				futures.add(dispatcher.<Void>sendMessage(address, signalData));
-				break;
-			}
+			futures.add(dispatcher.<Void>sendMessage(selector.getDestinationAddress(), signalData));
 		}
 		
 		for (final NotifyingFuture<Void> future : futures) {

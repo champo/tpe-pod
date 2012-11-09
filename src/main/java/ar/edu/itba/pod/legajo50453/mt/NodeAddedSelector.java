@@ -3,34 +3,40 @@ package ar.edu.itba.pod.legajo50453.mt;
 import java.util.Set;
 
 import org.jgroups.Address;
+import org.jgroups.View;
 
 import ar.edu.itba.pod.legajo50453.message.SignalData;
 
-public class NodeAddedSelector implements SignalSelector {
+public class NodeAddedSelector implements DistributionSelector {
 
 	private final SignalStore store;
-	
-	private final int nodeCount;
 	
 	private final Address me;
 
 	private final Address recipient;
 
-	public NodeAddedSelector(Address me, Address recipient, SignalStore store, int nodeCount) {
+	private final View view;
+	
+	public NodeAddedSelector(Address me, Address recipient, View view, SignalStore store) {
 		this.me = me;
 		this.recipient = recipient;
+		this.view = view;
 		this.store = store;
-		this.nodeCount = nodeCount;
 	}
 
 	@Override
 	public Set<SignalData> selectPrimaries() {
-		return store.getRandomPrimaries(store.getPrimaryCount() / nodeCount, me, recipient);
+		return store.getRandomPrimaries(store.getPrimaryCount() / view.size(), me, recipient);
 	}
 
 	@Override
 	public Set<SignalData> selectBackups() {
-		return store.getRandomBackups(store.getBackupCount() / nodeCount, me, recipient);
+		return store.getRandomBackups(store.getBackupCount() / view.size(), me, recipient);
+	}
+	
+	@Override
+	public Address getDestinationAddress() {
+		return recipient;
 	}
 
 }
