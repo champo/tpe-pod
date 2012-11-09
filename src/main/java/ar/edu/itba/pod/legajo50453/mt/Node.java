@@ -132,24 +132,51 @@ public class Node implements SignalProcessor, SPNode {
 	public void add(Signal signal) throws RemoteException {
 
 		logger.debug("Adding signal {}", signal);
-		//TODO: Randomize the primary add
-		if (store.add(signal)) {
 
-			final View view = currentView;
-			if (view != null) {
-				
-				// The signal is new enough, let's back it up
-				if (view.size() == 1) {
-					store.addBackup(new SignalData(signal, channel.getAddress()));
-				} else {
-					sendBackup(signal);
-				}
+		final View view = currentView;
+		if (view != null) {
+			
+			// The signal is new enough, let's back it up
+			if (view.size() == 1) {
+				store.add(signal);
+				store.addBackup(new SignalData(signal, channel.getAddress()));
+			} else {
+				final Address primary = sendPrimary(signal);
+				sendBackup(signal, primary);
 			}
+		} else {
+			store.add(signal);
 		}
 
 	}
+	
+	private Address sendPrimary(Signal signal) {
+		
+		final boolean success = false;
+		
+		while (channel.isConnected()) {
+			
+			final View view = currentView;
+			final Address me = channel.getAddress();
+			
+			final Address address = view.getMembers().get(rnd.nextInt(view.size()));
+			
+			logger.debug("Sending signal to {}", address);
+			final SignalData data = new SignalData(signal, null);
+			final Future<Void> response = dispatcher.sendMessage(address, new PrimarySignal(data));
+			
+			try {
+				response.get();
+				return address;
+			} catch (InterruptedException | ExecutionException e) {
+				continue;
+			}
+		}
+		
+		return null;
+	}
 
-	private void sendBackup(Signal signal) {
+	private void sendBackup(Signal signal, Address primary) {
 		
 		boolean success = false;
 		
@@ -160,12 +187,12 @@ public class Node implements SignalProcessor, SPNode {
 			
 			final Address address = view.getMembers().get(rnd.nextInt(view.size()));
 			
-			if (address.equals(me)) {
+			if (address.equals(primary)) {
 				continue;
 			}
 			
 			logger.debug("Sending signal to {}", address);
-			final Future<Void> response = dispatcher.sendMessage(address, new SignalData(signal, me));
+			final Future<Void> response = dispatcher.sendMessage(address, new SignalData(signal, primary));
 			
 			try {
 				response.get();
@@ -174,7 +201,6 @@ public class Node implements SignalProcessor, SPNode {
 				continue;
 			}
 		}
-		
 	}
 
 	@Override

@@ -6,12 +6,12 @@ Short term todo list
    - obtener un future
    - mandar mensajes a todos incluido yo
    - esperar respuestas
- - balancear el primario del add tambien
-   - fucking hate that
+ - balancear el primario del add tambien -- Done!
  - futureimpl is not thread safe -- Done!
  - bancarse procesamiento en sigle node mode -- Done!
  - stop de processor -- Done!
  - Abstraer la logica de seleccion de nodo a quien mandar en cambios de topologia (Se manda cagadas en el remove) -- Done!
+ - handlear quedarme solo -- Done!
  - clean exit
    - dejar de responder a pedidos externos
    - estado de "no acepto pedidos" en Processor
