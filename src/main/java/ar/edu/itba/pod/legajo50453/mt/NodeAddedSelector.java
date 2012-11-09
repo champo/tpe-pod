@@ -14,20 +14,23 @@ public class NodeAddedSelector implements SignalSelector {
 	
 	private final Address me;
 
-	public NodeAddedSelector(Address me, SignalStore store, int nodeCount) {
+	private final Address recipient;
+
+	public NodeAddedSelector(Address me, Address recipient, SignalStore store, int nodeCount) {
 		this.me = me;
+		this.recipient = recipient;
 		this.store = store;
 		this.nodeCount = nodeCount;
 	}
 
 	@Override
 	public Set<SignalData> selectPrimaries() {
-		return store.getRandomPrimaries(store.getPrimaryCount() / nodeCount, me);
+		return store.getRandomPrimaries(store.getPrimaryCount() / nodeCount, me, recipient);
 	}
 
 	@Override
 	public Set<SignalData> selectBackups() {
-		return store.getRandomBackups(store.getBackupCount() / nodeCount, me);
+		return store.getRandomBackups(store.getBackupCount() / nodeCount, me, recipient);
 	}
 
 }

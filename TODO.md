@@ -11,6 +11,21 @@ Short term todo list
  - futureimpl is not thread safe -- Done!
  - bancarse procesamiento en sigle node mode -- Done!
  - stop de processor -- Done!
+ - Abstraer la logica de seleccion de nodo a quien mandar en cambios de topologia (Se manda cagadas en el remove)
+ - clean exit
+   - dejar de responder a pedidos externos
+   - estado de "no acepto pedidos" en Processor
+   - escuchar evento de "termine la cola de pedidos locales"
+     - clear de señales
+   - escuchar evento de "respondi a pedidos en curso"
+     - aca puedo hacer el exit
+
+Testing
+
+ - drop de nodo durante procesamiento
+ - con mas señales
+ - varios cambios de topologia
+ - clean exit
 
 Reglas para modo degradado:
 

@@ -3,7 +3,6 @@ package ar.edu.itba.pod.legajo50453.mt;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -193,7 +192,7 @@ public class SignalStore {
 	}
 
 	
-	public Set<SignalData> getRandomPrimaries(long count, Address me) {
+	public Set<SignalData> getRandomPrimaries(long count, Address me, Address recipient) {
 		
 		writeLock.lock();
 		
@@ -201,36 +200,27 @@ public class SignalStore {
 			final Set<SignalData> result = new HashSet<>();
 			final List<Address> keys = new ArrayList<>(knownSignals.keySet());
 			
-			if (keys.size() == 0) {
+			for (int i = 0; i < count;) {
 				
-				final Iterator<Signal> iterator = primaries.iterator();
-				for (int i = 0; i < count; i++) {
-					final Signal signal = iterator.next();
-					
-					result.add(new SignalData(signal, me));
-					backups.add(signal);
+				final Address address = keys.get(rnd.nextInt(keys.size()));
+				if (address.equals(recipient)) {
+					continue;
 				}
 				
-			} else {
-			
-				for (int i = 0; i < count;) {
+				final List<Signal> signals = knownSignals.get(address);
+				
+				final int size = signals.size();
+				if (size > 0) {
+					final int index = rnd.nextInt(size);
+					final Signal signal = signals.get(index);
 					
-					final Address address = keys.get(rnd.nextInt(keys.size()));
-					final List<Signal> signals = knownSignals.get(address);
-					
-					final int size = signals.size();
-					if (size > 0) {
-						final int index = rnd.nextInt(size);
-						final Signal signal = signals.get(index);
+					if (primaries.contains(signal)) {
+						result.add(new SignalData(signal, address));
 						
-						if (primaries.contains(signal)) {
-							result.add(new SignalData(signal, address));
-							
-							signals.remove(index);
-							primaries.remove(signal);
-							
-							i++;
-						}
+						signals.remove(index);
+						primaries.remove(signal);
+						
+						i++;
 					}
 				}
 			}
@@ -241,7 +231,7 @@ public class SignalStore {
 		}
 	}
 	
-	public Set<SignalData> getRandomBackups(long count, Address me) {
+	public Set<SignalData> getRandomBackups(long count, Address me, Address recipient) {
 		
 		writeLock.lock();
 		
@@ -249,33 +239,27 @@ public class SignalStore {
 			final Set<SignalData> result = new HashSet<>();
 			final List<Address> keys = new ArrayList<>(knownSignals.keySet());
 			
-			if (keys.size() == 0) {
+			for (int i = 0; i < count;) {
 				
-				final Iterator<Signal> iterator = primaries.iterator();
-				for (int i = 0; i < count; i++) {
-					result.add(new SignalData(iterator.next(), me));
+				final Address address = keys.get(rnd.nextInt(keys.size()));
+				if (address.equals(recipient)) {
+					continue;
 				}
 				
-			} else {
+				final List<Signal> signals = knownSignals.get(address);
 				
-				for (int i = 0; i < count;) {
+				final int size = signals.size();
+				if (size > 0) {
+					final int index = rnd.nextInt(size);
+					final Signal signal = signals.get(index);
 					
-					final Address address = keys.get(rnd.nextInt(keys.size()));
-					final List<Signal> signals = knownSignals.get(address);
-					
-					final int size = signals.size();
-					if (size > 0) {
-						final int index = rnd.nextInt(size);
-						final Signal signal = signals.get(index);
+					if (backups.contains(signal)) {
+						result.add(new SignalData(signal, address));
 						
-						if (backups.contains(signal)) {
-							result.add(new SignalData(signal, address));
-							
-							signals.remove(index);
-							backups.remove(signal);
-							
-							i++;
-						}
+						signals.remove(index);
+						backups.remove(signal);
+						
+						i++;
 					}
 				}
 			}
@@ -316,6 +300,20 @@ public class SignalStore {
 			
 		} finally {
 			readLock.unlock();
+		}
+	}
+
+	public void makeBackups(Address me) {
+		
+		writeLock.lock();
+		try {
+			
+			for (final Signal signal : backups) {
+				knownSignals.put(me, signal);
+			}
+			
+		} finally {
+			writeLock.unlock();
 		}
 	}
 

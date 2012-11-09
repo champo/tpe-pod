@@ -145,10 +145,11 @@ public class MessageConsumer implements Runnable {
 	public void waitForPhaseEnd(int viewSize) throws Exception {
 		logger.debug("Waiting for phase end... (view size {}, have {})", viewSize, phaseCounter.availablePermits());
 		dispatcher.broadcast(new PhaseReady());
-		phaseCounter.acquire(viewSize - 1);
+		phaseCounter.acquire(viewSize);
 	}
 
 	private void ack(final Message msg, final AnswerableMessage answerable) {
+		
 		try {
 			dispatcher.respondTo(msg.getSrc(), answerable.getId(), null);
 		} catch (final Exception e) {

@@ -136,16 +136,21 @@ public class Node implements SignalProcessor, SPNode {
 		if (store.add(signal)) {
 
 			final View view = currentView;
-			if (view != null && view.size() > 1) {
+			if (view != null) {
+				
 				// The signal is new enough, let's back it up
-				sendBackup(signal);
+				if (view.size() == 1) {
+					store.addBackup(new SignalData(signal, channel.getAddress()));
+				} else {
+					sendBackup(signal);
+				}
 			}
 		}
 
 	}
 
 	private void sendBackup(Signal signal) {
-
+		
 		boolean success = false;
 		
 		while (!success && channel.isConnected()) {
@@ -219,20 +224,6 @@ public class Node implements SignalProcessor, SPNode {
 		
 		@Override
 		public void viewAccepted(View view) {
-			
-			logger.debug("A new view is in town");
-			
-			if (currentView == null) {
-				currentView = view;
-
-				if (view.size() > 1) {
-					startConsumer();
-					normalityRestored();
-				}
-				
-				return;
-			}
-			
 			handleViewAccepted(view);
 		}
 
@@ -246,6 +237,31 @@ public class Node implements SignalProcessor, SPNode {
 			
 			@Override
 			public void run() {
+				
+				logger.debug("A new view is in town");
+				
+				if (currentView == null) {
+					currentView = view;
+
+					startConsumer();
+					store.makeBackups(channel.getAddress());
+					
+					if (view.size() > 1) {
+						
+						try {
+							consumer.waitForPhaseEnd(view.size());
+							consumer.waitForPhaseEnd(view.size());
+							consumer.waitForPhaseEnd(view.size());
+						} catch (final Exception e) {
+							logger.error("Aborting due to {}", e);
+							System.exit(4);
+						}
+						
+						normalityRestored();
+					}
+					
+					return;
+				}
 				
 				final Set<Address> currentSet = new HashSet<>(currentView.getMembers());
 				final Set<Address> newSet = new HashSet<>(view.getMembers());
@@ -264,7 +280,8 @@ public class Node implements SignalProcessor, SPNode {
 				
 				final SetView<Address> added = Sets.difference(newSet, currentSet);
 				if (added.size() > 0) {
-					topologyChange(new NodeAddedSelector(channel.getAddress(), store, view.size()));
+					final Address newGuy = added.iterator().next();
+					topologyChange(new NodeAddedSelector(channel.getAddress(), newGuy, store, view.size()));
 				}
 			}
 		}).start();
