@@ -161,7 +161,6 @@ public class Node implements SignalProcessor, SPNode {
 			final View view = currentView;
 			final Address address = view.getMembers().get(rnd.nextInt(view.size()));
 			
-			logger.debug("Sending signal to {}", address);
 			final SignalData data = new SignalData(signal, null);
 			final Future<Void> response = dispatcher.sendMessage(address, new PrimarySignal(data));
 			
@@ -189,7 +188,6 @@ public class Node implements SignalProcessor, SPNode {
 				continue;
 			}
 			
-			logger.debug("Sending signal to {}", address);
 			final Future<Void> response = dispatcher.sendMessage(address, new SignalData(signal, primary));
 			
 			try {
@@ -211,7 +209,6 @@ public class Node implements SignalProcessor, SPNode {
 		recieved.incrementAndGet();
 		
 		try {
-			logger.debug("Processing signal", signal);
 			if (processor.isRunning()) {
 				return processor.process(signal).get();
 			} else {
@@ -255,9 +252,6 @@ public class Node implements SignalProcessor, SPNode {
 
 	}
 	
-	/**
-	 * @param view
-	 */
 	private void handleViewAccepted(final View view) {
 		new Thread(new Runnable() {
 			
