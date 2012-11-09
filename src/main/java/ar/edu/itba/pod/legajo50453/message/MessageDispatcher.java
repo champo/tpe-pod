@@ -58,6 +58,7 @@ public class MessageDispatcher {
 		try {
 			channel.send(address, new AnswerableMessage(id, obj));
 		} catch (final Exception e) {
+			logger.warn("Failed to send message, cancelling future", e);
 			addressToFuture.remove(address, future);
 			futures.remove(id);
 			

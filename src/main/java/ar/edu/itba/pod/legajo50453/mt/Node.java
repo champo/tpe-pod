@@ -57,7 +57,7 @@ public class Node implements SignalProcessor, SPNode {
 	
 	private final BlockingQueue<Message> inboundMessages;
 
-	private final Thread consumerThread;
+	private Thread consumerThread;
 
 	private final SignalStore store;
 
@@ -84,16 +84,20 @@ public class Node implements SignalProcessor, SPNode {
 		
 		workerPool = new WorkerPool(threads, store);
 		consumer = new MessageConsumer(inboundMessages, store, dispatcher, workerPool);
+	}
+
+	private void startConsumer() {
 		consumerThread = new Thread(consumer);
 		consumerThread.start();
 	}
 
 	@Override
 	public void join(String clusterName) throws RemoteException {
-		logger.info("Joining cluster " + clusterName);
+		logger.info("Joining cluster {}", clusterName);
 		
 		try {
 			channel.connect(clusterName);
+			logger.info("Connected to channel {}", clusterName);
 		} catch (final Exception e) {
 			logger.error("Failed to connect to cluster", e);
 		}
@@ -111,6 +115,9 @@ public class Node implements SignalProcessor, SPNode {
 			
 		currentView = null;
 		channel.disconnect();
+		
+		consumerThread.interrupt();
+		consumerThread = null;
 	}
 
 	@Override
@@ -124,7 +131,7 @@ public class Node implements SignalProcessor, SPNode {
 	@Override
 	public void add(Signal signal) throws RemoteException {
 
-		logger.debug("Adding signal", signal);
+		logger.debug("Adding signal {}", signal);
 		//TODO: Randomize the primary add
 		if (store.add(signal)) {
 
@@ -219,32 +226,48 @@ public class Node implements SignalProcessor, SPNode {
 				currentView = view;
 
 				if (view.size() > 1) {
+					startConsumer();
 					normalityRestored();
 				}
 				
 				return;
 			}
 			
-			final Set<Address> currentSet = new HashSet<>(currentView.getMembers());
-			final Set<Address> newSet = new HashSet<>(view.getMembers());
-			
-			currentView = view;
-			
-			final SetView<Address> removed = Sets.difference(currentSet, newSet);
-				
-			if (removed.size() > 1) {
-				logger.info("I don't have to put up with this :D");
-				System.exit(1);
-			} else if (removed.size() == 1) {
-				final Address change = removed.iterator().next();
-				topologyChange(new NodeDisconnectSelector(store, change, channel.getAddress()));
-			}
-			
-			final SetView<Address> added = Sets.difference(newSet, currentSet);
-			if (added.size() > 0) {
-				topologyChange(new NodeAddedSelector(channel.getAddress(), store, currentSet.size()));
-			}
+			handleViewAccepted(view);
 		}
+
+	}
+	
+	/**
+	 * @param view
+	 */
+	private void handleViewAccepted(final View view) {
+		new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				
+				final Set<Address> currentSet = new HashSet<>(currentView.getMembers());
+				final Set<Address> newSet = new HashSet<>(view.getMembers());
+				
+				currentView = view;
+				
+				final SetView<Address> removed = Sets.difference(currentSet, newSet);
+				
+				if (removed.size() > 1) {
+					logger.info("I don't have to put up with this :D");
+					System.exit(1);
+				} else if (removed.size() == 1) {
+					final Address change = removed.iterator().next();
+					topologyChange(new NodeDisconnectSelector(store, change, channel.getAddress()));
+				}
+				
+				final SetView<Address> added = Sets.difference(newSet, currentSet);
+				if (added.size() > 0) {
+					topologyChange(new NodeAddedSelector(channel.getAddress(), store, view.size()));
+				}
+			}
+		}).start();
 	}
 
 	private void topologyChange(SignalSelector selector) {
