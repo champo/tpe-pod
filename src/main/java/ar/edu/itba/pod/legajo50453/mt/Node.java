@@ -69,7 +69,7 @@ public class Node implements SignalProcessor, SPNode {
 
 	private final WorkerPool workerPool;
 
-	private boolean degraded;
+	private boolean degraded = true;
 	
 	public Node(int threads) throws Exception {
 
@@ -118,6 +118,8 @@ public class Node implements SignalProcessor, SPNode {
 		
 		consumerThread.interrupt();
 		consumerThread = null;
+		
+		degraded = true;
 	}
 
 	@Override
@@ -237,8 +239,10 @@ public class Node implements SignalProcessor, SPNode {
 	private void normalityRestored() {
 		logger.info("We now have normality, whatever that means");
 		
-		degraded = false;
-		processor.start();
+		if (currentView.size() > 1) {
+			degraded = false;
+			processor.start();
+		}
 	}
 		
 	private final class MessageReciever extends ReceiverAdapter {

@@ -60,7 +60,7 @@ public class NodeDisconnectSelector implements DistributionSelector {
 		while (true) {
 			final Address address = view.getMembers().get(rnd.nextInt(view.size()));
 			
-			if (view.size() == 1 && me.equals(address)) {
+			if (view.size() != 1 && me.equals(address)) {
 				continue;
 			}
 			
