@@ -154,13 +154,9 @@ public class Node implements SignalProcessor, SPNode {
 	
 	private Address sendPrimary(Signal signal) {
 		
-		final boolean success = false;
-		
 		while (channel.isConnected()) {
 			
 			final View view = currentView;
-			final Address me = channel.getAddress();
-			
 			final Address address = view.getMembers().get(rnd.nextInt(view.size()));
 			
 			logger.debug("Sending signal to {}", address);
@@ -185,8 +181,6 @@ public class Node implements SignalProcessor, SPNode {
 		while (!success && channel.isConnected()) {
 			
 			final View view = currentView;
-			final Address me = channel.getAddress();
-			
 			final Address address = view.getMembers().get(rnd.nextInt(view.size()));
 			
 			if (address.equals(primary)) {
