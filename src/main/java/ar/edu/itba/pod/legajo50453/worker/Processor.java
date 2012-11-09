@@ -37,7 +37,7 @@ public final class Processor {
 	final static Logger logger = LoggerFactory.getLogger(Processor.class);
 	
 	private final Object workLock = new Object();
-
+	
 	private final MessageDispatcher dispatcher;
 	
 	private final LinkedBlockingDeque<WorkRequest> requests;
@@ -52,6 +52,10 @@ public final class Processor {
 	
 	private boolean paused;
 
+	private boolean running;
+	
+	private final Semaphore requestReady = new Semaphore(0);
+
 	public Processor(Channel channel, MessageDispatcher dispatcher) {
 		this.dispatcher = dispatcher;
 		this.requests = new LinkedBlockingDeque<>();
@@ -62,6 +66,7 @@ public final class Processor {
 
 	public void start() {
 		
+		running = true;
 		if (runner == null) {
 			runner = new Thread(new RequestConsumer());
 			runner.start();
@@ -72,7 +77,7 @@ public final class Processor {
 	}
 	
 	public boolean isRunning() {
-		return runner != null;
+		return running;
 	}
 	
 	public Future<Result> process(Signal reference) {
@@ -151,9 +156,25 @@ public final class Processor {
 	
 	public void stop() {
 		
+		running = false;
 		if (runner != null) {
-			requests.clear();
-			runner.interrupt();
+			
+			if (requests.size() == 0) {
+				runner.interrupt();
+			}
+
+			
+			int waits;
+			
+			synchronized (workLock) {
+				waits = working.size();
+				requestReady.drainPermits();
+			}
+			
+			try {
+				requestReady.acquire(waits);
+			} catch (final InterruptedException e) {
+			}
 
 			try {
 				runner.join();
@@ -171,6 +192,7 @@ public final class Processor {
 		synchronized (workLock) {
 			toAbort = new HashSet<>(working);
 			working.clear();
+			requestReady.drainPermits();
 		}
 		
 		for (final WorkRequest request : toAbort) {
@@ -190,7 +212,7 @@ public final class Processor {
 				
 			try {
 				
-				while (true) {
+				while (running) {
 					permit.acquire();
 					final WorkRequest request = requests.poll(1, TimeUnit.SECONDS);
 					if (request != null) {
@@ -229,6 +251,7 @@ public final class Processor {
 
 			synchronized (workLock) {
 				working.remove(request);
+				requestReady.release();
 			}
 			
 			logger.debug("Joining results");

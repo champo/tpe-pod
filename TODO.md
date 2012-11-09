@@ -13,12 +13,7 @@ Short term todo list
  - Abstraer la logica de seleccion de nodo a quien mandar en cambios de topologia (Se manda cagadas en el remove) -- Done!
  - handlear quedarme solo -- Done!
  - clean exit
-   - dejar de responder a pedidos externos
-   - estado de "no acepto pedidos" en Processor
-   - escuchar evento de "termine la cola de pedidos locales"
-     - clear de señales
-   - escuchar evento de "respondi a pedidos en curso"
-     - aca puedo hacer el exit
+   - estado de "no acepto pedidos" en Processor -- Done!
 
 Testing
 
