@@ -26,12 +26,14 @@ public class NodeAddedSelector implements DistributionSelector {
 
 	@Override
 	public Set<SignalData> selectPrimaries() {
-		return store.getRandomPrimaries(store.getPrimaryCount() / view.size(), me, recipient);
+		final int count = (int) Math.ceil((double) store.getPrimaryCount() / (double) view.size()); 
+		return store.getRandomPrimaries(count, me, recipient);
 	}
 
 	@Override
 	public Set<SignalData> selectBackups() {
-		return store.getRandomBackups(store.getBackupCount() / view.size(), me, recipient);
+		final int count = (int) Math.ceil((double) store.getBackupCount() / (double) view.size());
+		return store.getRandomBackups(count, me, recipient);
 	}
 	
 	@Override

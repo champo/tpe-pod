@@ -239,6 +239,15 @@ public class SignalStore {
 			final Set<SignalData> result = new HashSet<>();
 			final List<Address> keys = new ArrayList<>(knownSignals.keySet());
 			
+			int available = knownSignals.size();
+			if (keys.contains(recipient)) {
+				available -= knownSignals.get(recipient).size();
+			}
+			
+			if (available > count) {
+				count = available;
+			}
+			
 			for (int i = 0; i < count;) {
 				
 				final Address address = keys.get(rnd.nextInt(keys.size()));
@@ -262,6 +271,7 @@ public class SignalStore {
 						i++;
 					}
 				}
+				
 			}
 			
 			return result;
