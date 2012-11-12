@@ -13,6 +13,14 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>monits-external</id>
+            <url>http://nexus.monits.com/content/repositories/external/</url>
+            <name>Monits external</name>
+        </repository>
+    </repositories>
+
     <build>
         <plugins>
             <plugin>
