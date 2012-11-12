@@ -240,11 +240,11 @@ public class SignalStore {
 			final List<Address> keys = new ArrayList<>(knownSignals.keySet());
 			
 			int available = knownSignals.size();
-			if (keys.contains(recipient)) {
+			if (knownSignals.containsKey(recipient)) {
 				available -= knownSignals.get(recipient).size();
 			}
 			
-			if (available > count) {
+			if (available < count) {
 				count = available;
 			}
 			
