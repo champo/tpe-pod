@@ -1,0 +1,13 @@
+Welcome stranger!
+
+Building this project is quite simple:
+
+    mvn clean install
+
+This will generate a nice ready-to-run jar under target/tpe-1.0-SNAPSHOT-jar-with-dependencies.jar, to run it just do:
+
+    java -Djgroups.bind_addr=bind_ip -jar target/tpe-1.0-SNAPSHOT-jar-with-dependencies.jar port threads
+
+Where port is the port number that RMI will use, and threads is the number of processing threads wanted. There's one final detail, bind_ip is the ip address that server will bind to. If you want to run on localhost, you can skip that. Otherwise, you have to set it to a valid ip address that the server can listen on, and that will let it communicate with other nodes in the cluster.
+
+
